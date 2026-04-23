@@ -1,0 +1,5 @@
+// Placeholder for shared UI components (non-shadcn custom components).
+// Examples:
+//   Avatar.jsx, MessageBubble.jsx, ChatInput.jsx, etc.
+
+export {};

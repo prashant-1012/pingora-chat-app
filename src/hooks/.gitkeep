@@ -1,0 +1,7 @@
+// Placeholder for custom hooks.
+// Example hooks to be added:
+//   useAuth()       — Phase 2: subscribe to auth state
+//   useMessages()   — Phase 4: subscribe to conversation messages
+//   usePresence()   — Phase 6: track online/offline state
+
+export {};
