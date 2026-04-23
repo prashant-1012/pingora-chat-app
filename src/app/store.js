@@ -1,23 +1,19 @@
 import { configureStore } from "@reduxjs/toolkit";
-
-// Slices will be imported and added here as we build each feature.
-// Phase 2: authSlice
-// Phase 4: chatSlice
-// Phase 6: presenceSlice
+import authReducer from "../features/auth/authSlice";
 
 export const store = configureStore({
   reducer: {
-    // auth: authReducer,   // added in Phase 2
-    // chat: chatReducer,   // added in Phase 4
-    // presence: presenceReducer, // added in Phase 6
+    auth: authReducer,
+    // chat: chatReducer,     — Phase 4
+    // presence: presenceReducer, — Phase 6
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      // Needed because Firebase Timestamps are non-serializable.
-      // We'll configure ignoredActions/paths as needed per slice.
       serializableCheck: {
+        // Firebase Timestamps in actions would fail the serializable check.
+        // We serialize users in authSlice before storing, so no issues there.
+        // We'll add specific ignoredPaths here if needed as we grow.
         ignoredActions: ["persist/PERSIST"],
-        ignoredPaths: [],
       },
     }),
 });

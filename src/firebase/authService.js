@@ -1,6 +1,5 @@
-// Auth service — wraps Firebase Auth SDK calls.
-// All auth logic lives here; never call Firebase Auth directly from components.
-// Phase 2 will populate these functions fully.
+// Auth service — all Firebase Auth + Firestore user-write logic lives here.
+// Components and slices never import Firebase directly.
 
 import {
   createUserWithEmailAndPassword,
@@ -9,16 +8,36 @@ import {
   onAuthStateChanged,
   updateProfile,
 } from "firebase/auth";
-import { auth } from "./config";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "./config";
 
 /**
- * Register a new user with email and password.
- * Also sets the displayName on the Firebase user object.
+ * Register a new user.
+ * 1. Creates the Firebase Auth account.
+ * 2. Updates the Auth profile with displayName.
+ * 3. Writes a user document to Firestore `users/{uid}`.
  */
 export const registerUser = async ({ email, password, displayName }) => {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-  await updateProfile(userCredential.user, { displayName });
-  return userCredential.user;
+  const user = userCredential.user;
+
+  // Set displayName on the Firebase Auth profile
+  await updateProfile(user, { displayName });
+
+  // Write the user document to Firestore
+  // This is the canonical user record used throughout the app.
+  await setDoc(doc(db, "users", user.uid), {
+    uid: user.uid,
+    displayName,
+    email: user.email,
+    photoURL: null,
+    createdAt: serverTimestamp(),
+    lastSeen: serverTimestamp(),
+    isOnline: true,
+    fcmToken: null, // populated in Phase 8
+  });
+
+  return user;
 };
 
 /**
@@ -35,8 +54,9 @@ export const loginUser = async ({ email, password }) => {
 export const logoutUser = () => signOut(auth);
 
 /**
- * Subscribe to auth state changes.
- * Returns the unsubscribe function — call it on component unmount.
+ * Subscribe to Firebase auth state changes.
+ * Fires immediately with current state, then on every change.
+ * Returns the unsubscribe function — always call it on unmount.
  */
 export const subscribeToAuthChanges = (callback) => {
   return onAuthStateChanged(auth, callback);

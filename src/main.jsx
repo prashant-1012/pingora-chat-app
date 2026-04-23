@@ -2,15 +2,20 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import { store } from "./app/store";
+import AuthProvider from "./features/auth/AuthProvider";
 import App from "./App";
 import "./index.css";
 
-// Entry point: wraps the app in Redux Provider.
-// Firebase Auth subscription (Phase 2) will be initialized here via AuthProvider.
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <Provider store={store}>
-      <App />
+      {/*
+        AuthProvider must be INSIDE Redux Provider (it uses useDispatch/useSelector).
+        AuthProvider must wrap App (it gates rendering until Firebase auth is resolved).
+      */}
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </Provider>
   </StrictMode>
 );

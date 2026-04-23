@@ -25,15 +25,19 @@
 - [x] Verify dev server runs (npm run dev)
 
 ## Phase 2: Firebase Auth
-- [ ] Auth context / provider
-- [ ] authSlice — currentUser, loading, error
-- [ ] Register form (name, email, password)
-- [ ] Login form
-- [ ] Logout button
-- [ ] Protected route wrapper
-- [ ] Persist auth across page refresh
-- [ ] Write user doc to Firestore on register
-- [ ] Update docs
+- [x] authSlice — currentUser, authLoading, actionLoading, error + selectors
+- [x] Async thunks: registerAsync, loginAsync, logoutAsync with friendly error messages
+- [x] authService.js — register writes full user doc to Firestore users/{uid}
+- [x] useAuth hook — subscribes to onAuthStateChanged, syncs to Redux
+- [x] AuthProvider — blocks render until auth state resolved (prevents login flash)
+- [x] ProtectedRoute — guards /chat, redirects to /login with return URL
+- [x] LoginPage — full UI with error display, loading spinner, redirect-to-origin
+- [x] RegisterPage — full UI with client-side validation, loading spinner
+- [x] ChatPage stub — shows currentUser info + working logout button
+- [x] App.jsx — /chat guarded by ProtectedRoute
+- [x] main.jsx — AuthProvider wraps App inside Redux Provider
+- [x] Auth persists across page refresh (Firebase Auth handles this automatically)
+- [x] Update docs
 
 ## Phase 3: Firestore Data Model
 - [ ] Design users collection
