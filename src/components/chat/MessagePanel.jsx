@@ -27,7 +27,7 @@ const groupMessages = (messages) => {
   return groups;
 };
 
-const MessagePanel = ({ otherUser }) => {
+const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
   const dispatch = useDispatch();
   const currentUser = useSelector(selectCurrentUser);
   const conversation = useSelector(selectActiveConversation);
@@ -56,18 +56,17 @@ const MessagePanel = ({ otherUser }) => {
     setSending(false);
   };
 
+  const isGroup = conversation?.type === "group";
+
   // Header display info
-  const headerName =
-    conversation?.type === "group"
-      ? conversation.groupName
-      : otherUser?.displayName ?? "Chat";
+  const headerName = isGroup
+    ? conversation.groupName
+    : otherUser?.displayName ?? "Chat";
 
   const headerInitials = headerName
-    ?.split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "?";
+    ?.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
+
+  const memberCount = conversation?.members?.length ?? 0;
 
   const grouped = groupMessages(messages);
 
@@ -75,32 +74,47 @@ const MessagePanel = ({ otherUser }) => {
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-card">
-        <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${isGroup ? "rounded-xl bg-primary/15 border border-primary/20" : "rounded-full bg-primary/20"}`}>
           <span className="text-sm font-semibold text-primary">{headerInitials}</span>
         </div>
+
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">{headerName}</p>
-          {otherUser?.email && (
+          {isGroup ? (
+            <p className="text-xs text-muted-foreground">{memberCount} member{memberCount !== 1 ? "s" : ""}</p>
+          ) : otherUser?.email ? (
             <p className="text-xs text-muted-foreground truncate">{otherUser.email}</p>
-          )}
+          ) : null}
         </div>
-        {/* Placeholder for future actions (search, video call, etc.) */}
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 rounded-full bg-emerald-500" title="Online (Phase 6)" />
+
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          {isGroup ? (
+            // Group info button
+            <button
+              id="group-info-btn"
+              onClick={onShowGroupInfo}
+              title="Group info"
+              className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </button>
+          ) : (
+            // Online indicator placeholder (Phase 6)
+            <div className="w-2 h-2 rounded-full bg-emerald-500" title="Online (Phase 6)" />
+          )}
         </div>
       </div>
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
         {messagesLoading ? (
-          // Skeleton messages
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className={`flex ${i % 2 === 0 ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`h-8 rounded-2xl bg-muted animate-pulse
-                    ${i % 2 === 0 ? "w-40" : "w-56"}`}
-                />
+                <div className={`h-8 rounded-2xl bg-muted animate-pulse ${i % 2 === 0 ? "w-40" : "w-56"}`} />
               </div>
             ))}
           </div>
@@ -118,7 +132,10 @@ const MessagePanel = ({ otherUser }) => {
           grouped.map((group, gi) => {
             const isOwn = group[0].senderId === currentUser?.uid;
             const sender = userCache[group[0].senderId];
-            const senderName = isOwn ? currentUser?.displayName : sender?.displayName;
+            // In group chats, always show sender name for received messages
+            const senderName = isOwn
+              ? null
+              : sender?.displayName ?? group[0].senderId.slice(0, 8);
 
             return (
               <div key={gi} className="space-y-1">
@@ -127,7 +144,7 @@ const MessagePanel = ({ otherUser }) => {
                     key={msg.id}
                     message={msg}
                     isOwn={isOwn}
-                    senderName={!isOwn ? senderName : null}
+                    senderName={senderName}
                   />
                 ))}
               </div>

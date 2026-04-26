@@ -1,21 +1,25 @@
 // ChatPage — the full two-panel chat application layout.
-// Phase 4: 1-on-1 messaging with real-time Firestore subscriptions.
+// Phase 4: 1-on-1 messaging. Phase 5: Group chat + admin controls.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   selectActiveConversationId,
   selectActiveConversation,
   selectUserCache,
   setActiveConversation,
+  cacheUser,
+  clearChat,
 } from "../features/chat/chatSlice";
 import { selectCurrentUser } from "../features/auth/authSlice";
 import useConversations from "../hooks/useConversations";
 import useMessages from "../hooks/useMessages";
+import { getUsersByUids } from "../firebase/userService";
 import Sidebar from "../components/chat/Sidebar";
 import MessagePanel from "../components/chat/MessagePanel";
 import EmptyState from "../components/chat/EmptyState";
 import UserSearchModal from "../components/chat/UserSearchModal";
+import GroupInfoPanel from "../components/chat/GroupInfoPanel";
 
 const ChatPage = () => {
   const dispatch = useDispatch();
@@ -25,6 +29,7 @@ const ChatPage = () => {
   const userCache = useSelector(selectUserCache);
 
   const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
   // Mobile: show sidebar ("sidebar") or messages ("messages")
   const [mobileView, setMobileView] = useState("sidebar");
 
@@ -32,15 +37,42 @@ const ChatPage = () => {
   useConversations(currentUser?.uid);
   useMessages(activeConversationId);
 
+  // When switching to a group conversation, fetch & cache all member profiles
+  useEffect(() => {
+    if (!activeConversation || activeConversation.type !== "group") return;
+    const uncachedUids = (activeConversation.members ?? []).filter(
+      (uid) => uid !== currentUser?.uid && !userCache[uid]
+    );
+    if (uncachedUids.length === 0) return;
+
+    getUsersByUids(uncachedUids).then((users) => {
+      users.forEach((u) => dispatch(cacheUser(u)));
+    });
+  }, [activeConversationId, activeConversation, currentUser?.uid]); // eslint-disable-line
+
+  // Close group info when switching conversations
+  useEffect(() => {
+    setShowGroupInfo(false);
+  }, [activeConversationId]);
+
   const handleSelectConversation = (id) => {
     dispatch(setActiveConversation(id));
     setMobileView("messages");
   };
 
+  const handleLeaveGroup = () => {
+    // Leaving the group removes us — the conversation disappears from sidebar.
+    // Navigate back to empty state.
+    dispatch(clearChat());
+    setShowGroupInfo(false);
+    setMobileView("sidebar");
+  };
+
   // The "other" user in a direct conversation (for MessagePanel header)
-  const otherUid = activeConversation?.type === "direct"
-    ? activeConversation.members?.find((uid) => uid !== currentUser?.uid)
-    : null;
+  const otherUid =
+    activeConversation?.type === "direct"
+      ? activeConversation.members?.find((uid) => uid !== currentUser?.uid)
+      : null;
   const otherUser = otherUid ? userCache[otherUid] : null;
 
   return (
@@ -77,15 +109,26 @@ const ChatPage = () => {
         )}
 
         {activeConversationId ? (
-          <MessagePanel otherUser={otherUser} />
+          <MessagePanel
+            otherUser={otherUser}
+            onShowGroupInfo={() => setShowGroupInfo(true)}
+          />
         ) : (
           <EmptyState onNewChat={() => setShowNewChatModal(true)} />
         )}
       </div>
 
-      {/* New chat modal (triggered from EmptyState) */}
+      {/* ── Modals ──────────────────────────────── */}
       {showNewChatModal && (
         <UserSearchModal onClose={() => setShowNewChatModal(false)} />
+      )}
+
+      {showGroupInfo && activeConversation?.type === "group" && (
+        <GroupInfoPanel
+          conversation={activeConversation}
+          onClose={() => setShowGroupInfo(false)}
+          onLeave={handleLeaveGroup}
+        />
       )}
     </div>
   );

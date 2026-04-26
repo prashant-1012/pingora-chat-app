@@ -1,6 +1,6 @@
 // Sidebar — left panel with conversation list, user search, and sign-out.
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   selectConversations,
@@ -13,6 +13,7 @@ import { logoutAsync } from "../../features/auth/authSlice";
 import { getUserById } from "../../firebase/userService";
 import ConversationItem from "./ConversationItem";
 import UserSearchModal from "./UserSearchModal";
+import CreateGroupModal from "./CreateGroupModal";
 
 const Sidebar = ({ onSelectConversation }) => {
   const dispatch = useDispatch();
@@ -21,10 +22,24 @@ const Sidebar = ({ onSelectConversation }) => {
   const conversationsLoading = useSelector(selectConversationsLoading);
   const activeConversationId = useSelector(selectActiveConversationId);
 
-  const [showModal, setShowModal] = useState(false);
+  const [showDmModal, setShowDmModal] = useState(false);
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const dropdownRef = useRef(null);
 
-  // Fetch + cache user profiles for conversation participants
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Fetch + cache user profiles for all conversation participants (DMs + groups)
   useEffect(() => {
     const uidsToFetch = new Set();
     conversations.forEach((conv) => {
@@ -32,7 +47,6 @@ const Sidebar = ({ onSelectConversation }) => {
         if (uid !== currentUser?.uid) uidsToFetch.add(uid);
       });
     });
-
     uidsToFetch.forEach(async (uid) => {
       try {
         const user = await getUserById(uid);
@@ -49,20 +63,14 @@ const Sidebar = ({ onSelectConversation }) => {
     setSigningOut(false);
   };
 
-  // Avatar initials
   const myInitials = currentUser?.displayName
-    ?.split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "?";
+    ?.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
 
   return (
     <>
       <aside className="flex flex-col h-full w-full border-r border-border bg-card">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-4 border-b border-border">
-          {/* Logo */}
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
               <svg className="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -72,23 +80,53 @@ const Sidebar = ({ onSelectConversation }) => {
             <span className="text-base font-bold text-foreground tracking-tight">PINGORA</span>
           </div>
 
-          {/* New chat button */}
-          <button
-            id="new-chat-btn"
-            onClick={() => setShowModal(true)}
-            title="New conversation"
-            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
+          {/* New chat dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              id="new-chat-btn"
+              onClick={() => setShowDropdown((v) => !v)}
+              title="New conversation"
+              className={`p-2 rounded-xl transition-colors ${
+                showDropdown
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+
+            {showDropdown && (
+              <div className="absolute right-0 top-full mt-1.5 w-48 bg-card border border-border rounded-xl shadow-xl z-20 py-1 overflow-hidden">
+                <button
+                  id="new-dm-btn"
+                  onClick={() => { setShowDropdown(false); setShowDmModal(true); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                >
+                  <svg className="w-4 h-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  New message
+                </button>
+                <button
+                  id="new-group-btn"
+                  onClick={() => { setShowDropdown(false); setShowGroupModal(true); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                >
+                  <svg className="w-4 h-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                  New group
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Conversations list */}
         <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
           {conversationsLoading ? (
-            // Skeleton loaders
             <div className="space-y-1 px-1 pt-1">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="flex items-center gap-3 px-2 py-3 rounded-xl animate-pulse">
@@ -109,7 +147,7 @@ const Sidebar = ({ onSelectConversation }) => {
               </div>
               <p className="text-sm text-muted-foreground">No conversations yet</p>
               <button
-                onClick={() => setShowModal(true)}
+                onClick={() => setShowDmModal(true)}
                 className="mt-2 text-xs text-primary hover:underline underline-offset-4"
               >
                 Start a new chat →
@@ -127,7 +165,7 @@ const Sidebar = ({ onSelectConversation }) => {
           )}
         </div>
 
-        {/* Footer — current user + sign out */}
+        {/* Footer */}
         <div className="flex items-center gap-3 px-4 py-3 border-t border-border">
           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
             <span className="text-xs font-semibold text-primary">{myInitials}</span>
@@ -150,7 +188,8 @@ const Sidebar = ({ onSelectConversation }) => {
         </div>
       </aside>
 
-      {showModal && <UserSearchModal onClose={() => setShowModal(false)} />}
+      {showDmModal && <UserSearchModal onClose={() => setShowDmModal(false)} />}
+      {showGroupModal && <CreateGroupModal onClose={() => setShowGroupModal(false)} />}
     </>
   );
 };

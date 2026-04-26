@@ -66,10 +66,14 @@
 - [x] Firestore Timestamps serialized to ISO strings (no Redux serialization errors)
 
 ## Phase 5: Group Chat
-- [ ] Create group conversation
-- [ ] Add/remove members
-- [ ] Group messaging UI
-- [ ] Group metadata (name, avatar)
+- [x] `chatService.js` — addMemberToGroup, removeMemberFromGroup, updateGroupName, transferAdmin
+- [x] `userService.js` — getUsersByUids batch fetch
+- [x] `CreateGroupModal.jsx` — two-step: name + add members by email, create group
+- [x] `GroupInfoPanel.jsx` — member list, admin badge, rename (admin), add member (admin), remove member (admin), auto-promote on admin leave, leave group
+- [x] `Sidebar.jsx` — "+" dropdown with New message / New group options
+- [x] `MessagePanel.jsx` — group header (rounded-square icon, member count, info button)
+- [x] `ChatPage.jsx` — wires GroupInfoPanel, auto-fetches group member profiles, leave group flow
+
 
 ## Phase 6: Presence System
 - [ ] Online/offline detection (Realtime DB or Firestore heartbeat)

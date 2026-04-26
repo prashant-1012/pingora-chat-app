@@ -16,6 +16,7 @@ import {
   onSnapshot,
   serverTimestamp,
   arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
 import { db } from "./config";
 
@@ -183,4 +184,51 @@ export const subscribeToMessages = (conversationId, callback, messageLimit = 100
 export const markMessageAsRead = async (conversationId, messageId, uid) => {
   const ref = doc(db, "conversations", conversationId, "messages", messageId);
   await updateDoc(ref, { readBy: arrayUnion(uid) });
+};
+
+// ─── Group Management (Phase 5) ──────────────────────────────────────────────
+
+/**
+ * Add a member to a group conversation.
+ */
+export const addMemberToGroup = async (conversationId, uid) => {
+  const ref = doc(db, "conversations", conversationId);
+  await updateDoc(ref, {
+    members: arrayUnion(uid),
+    updatedAt: serverTimestamp(),
+  });
+};
+
+/**
+ * Remove a member from a group conversation.
+ * Also used for leaving a group (pass current user's own UID).
+ */
+export const removeMemberFromGroup = async (conversationId, uid) => {
+  const ref = doc(db, "conversations", conversationId);
+  await updateDoc(ref, {
+    members: arrayRemove(uid),
+    updatedAt: serverTimestamp(),
+  });
+};
+
+/**
+ * Update a group's display name.
+ */
+export const updateGroupName = async (conversationId, groupName) => {
+  const ref = doc(db, "conversations", conversationId);
+  await updateDoc(ref, {
+    groupName,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+/**
+ * Transfer admin rights to another member.
+ */
+export const transferAdmin = async (conversationId, newAdminId) => {
+  const ref = doc(db, "conversations", conversationId);
+  await updateDoc(ref, {
+    adminId: newAdminId,
+    updatedAt: serverTimestamp(),
+  });
 };
