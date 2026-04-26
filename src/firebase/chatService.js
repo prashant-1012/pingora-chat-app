@@ -53,9 +53,13 @@ const serializeMessage = (id, data) => ({
   text: data.text ?? "",
   mediaURL: data.mediaURL ?? null,
   mediaType: data.mediaType ?? null,
+  fileName: data.fileName ?? null,
+  fileSize: data.fileSize ?? null,
   sentAt: serializeTimestamp(data.sentAt),
   readBy: data.readBy ?? [],
   reactions: data.reactions ?? {},
+  // Phase 7: message reply
+  replyTo: data.replyTo ?? null, // { messageId, text, senderId, senderName }
 });
 
 // ─── Conversations ────────────────────────────────────────────────────────────
@@ -133,26 +137,37 @@ export const subscribeToConversations = (uid, callback) => {
  * Send a message to a conversation.
  * Also updates the conversation's lastMessage + updatedAt fields.
  */
-export const sendMessage = async (conversationId, { senderId, text, mediaURL = null, mediaType = null }) => {
+export const sendMessage = async (
+  conversationId,
+  { senderId, text, mediaURL = null, mediaType = null, fileName = null, fileSize = null, replyTo = null }
+) => {
   const messagesRef = collection(db, "conversations", conversationId, "messages");
   const conversationRef = doc(db, "conversations", conversationId);
 
   await addDoc(messagesRef, {
     senderId,
-    text,
+    text: text || "",
     mediaURL,
     mediaType,
+    fileName,
+    fileSize,
     sentAt: serverTimestamp(),
     readBy: [senderId],
     reactions: {},
+    replyTo,
   });
 
+  // Derive a sensible lastMessage preview based on media type
+  const lastMsgText =
+    text ||
+    (mediaType === "image" ? "📷 Photo" :
+     mediaType === "video" ? "🎥 Video" :
+     mediaType === "audio" ? "🎵 Audio" :
+     mediaType === "file"  ? `📎 ${fileName ?? "File"}` :
+     "📎 Attachment");
+
   await updateDoc(conversationRef, {
-    lastMessage: {
-      text: text || (mediaType === "image" ? "📷 Photo" : "📎 File"),
-      senderId,
-      sentAt: serverTimestamp(),
-    },
+    lastMessage: { text: lastMsgText, senderId, sentAt: serverTimestamp() },
     updatedAt: serverTimestamp(),
   });
 };

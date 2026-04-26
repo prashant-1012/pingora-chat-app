@@ -88,10 +88,16 @@
 - [x] `ChatPage.jsx` — calls usePresence, subscribes to all DM partner statuses in sidebar
 
 ## Phase 7: Rich Features
-- [ ] File/image upload (Firebase Storage)
-- [ ] Image preview in chat
-- [ ] Message reactions (emoji)
-- [ ] Read receipts
+- [x] `storageService.js` — uploadFile (all types, 50 MB limit, progress), formatFileSize, getMediaType, deleteStorageFile
+- [x] `chatService.js` — sendMessage updated with fileName, fileSize, replyTo fields; smart lastMessage preview per media type
+- [x] `chatSlice.js` — replyingTo state, setReplyingTo/clearReplyingTo, selectReplyingTo, selectMediaMessages; sendMessageAsync passes all Phase 7 fields
+- [x] `MediaMessage.jsx` — image (with fullscreen lightbox), video (inline player), audio (player), file (download card + type icon), text with URL auto-detection
+- [x] `MediaGalleryDrawer.jsx` — slide-in right drawer; tabs All/Images/Videos/Audio/Files; image grid + lightbox; list view for other types with download
+- [x] `ReplyBar.jsx` — reply preview bar with sender + message preview; dismiss clears Redux state
+- [x] `MessageBubble.jsx` — reply quote block (styled accent border), media rendering, URL links, hover reply button → setReplyingTo
+- [x] `MessageInput.jsx` — paperclip button (all file types), paste-to-attach, onFileSelect callback
+- [x] `MessagePanel.jsx` — upload progress bar, upload error display, gallery button with media badge count, ReplyBar, passes replyingTo to all sends
+
 
 ## Phase 8: Push Notifications (FCM)
 - [ ] FCM token registration

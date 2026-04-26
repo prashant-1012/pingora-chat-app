@@ -1,5 +1,6 @@
 // MessagePanel — the right side chat panel with header, messages, and input.
-// Phase 6: real-time online status in header + typing indicators above input.
+// Phase 6: online status, typing indicators.
+// Phase 7: file upload, reply system, media gallery drawer.
 
 import { useRef, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -8,15 +9,20 @@ import {
   selectMessagesLoading,
   selectActiveConversation,
   selectUserCache,
+  selectReplyingTo,
+  selectMediaMessages,
   sendMessageAsync,
 } from "../../features/chat/chatSlice";
 import { selectCurrentUser } from "../../features/auth/authSlice";
 import { selectUserStatus } from "../../features/presence/presenceSlice";
 import { subscribeToTyping } from "../../firebase/presenceService";
+import { uploadFile } from "../../firebase/storageService";
 import useUserStatus from "../../hooks/useUserStatus";
 import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
 import TypingIndicator from "./TypingIndicator";
+import ReplyBar from "./ReplyBar";
+import MediaGalleryDrawer from "./MediaGalleryDrawer";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,14 +41,13 @@ const groupMessages = (messages) => {
 
 const formatLastSeen = (isoString) => {
   if (!isoString) return null;
-  const date = new Date(isoString);
-  const diffMs = Date.now() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "last seen just now";
-  if (diffMins < 60) return `last seen ${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `last seen ${diffHours}h ago`;
-  return `last seen ${date.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "last seen just now";
+  if (mins < 60) return `last seen ${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `last seen ${hrs}h ago`;
+  return `last seen ${new Date(isoString).toLocaleDateString([], { month: "short", day: "numeric" })}`;
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -54,69 +59,95 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
   const messages = useSelector(selectMessages);
   const messagesLoading = useSelector(selectMessagesLoading);
   const userCache = useSelector(selectUserCache);
+  const replyingTo = useSelector(selectReplyingTo);
+  const mediaMessages = useSelector(selectMediaMessages);
 
   const isGroup = conversation?.type === "group";
 
-  // ── Online status (DM only) ──────────────────────────────────────────────
+  // ── Online status (DM only) ────────────────────────────────────────────────
   const otherUid = !isGroup
     ? conversation?.members?.find((uid) => uid !== currentUser?.uid)
     : null;
-
-  // Subscribe to the DM partner's status (no-op for groups)
   useUserStatus(otherUid);
   const otherStatus = useSelector(selectUserStatus(otherUid));
 
-  // ── Typing indicator ──────────────────────────────────────────────────────
+  // ── Typing indicator ───────────────────────────────────────────────────────
   const [typingUids, setTypingUids] = useState([]);
-
   useEffect(() => {
     if (!conversation?.id) return;
-    const unsubscribe = subscribeToTyping(conversation.id, (uids) => {
-      setTypingUids(uids);
-    });
-    return () => {
-      unsubscribe();
-      setTypingUids([]);
-    };
+    const unsub = subscribeToTyping(conversation.id, (uids) => setTypingUids(uids));
+    return () => { unsub(); setTypingUids([]); };
   }, [conversation?.id]);
 
-  // ── Auto-scroll ───────────────────────────────────────────────────────────
+  // ── Auto-scroll ────────────────────────────────────────────────────────────
   const messagesEndRef = useRef(null);
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUids]);
 
-  // ── Send ──────────────────────────────────────────────────────────────────
+  // ── Text send ──────────────────────────────────────────────────────────────
   const [sending, setSending] = useState(false);
   const handleSend = async (text) => {
     if (!conversation || !text.trim()) return;
     setSending(true);
-    await dispatch(
-      sendMessageAsync({
-        conversationId: conversation.id,
-        senderId: currentUser.uid,
-        text: text.trim(),
-      })
-    );
+    await dispatch(sendMessageAsync({
+      conversationId: conversation.id,
+      senderId: currentUser.uid,
+      text: text.trim(),
+      replyTo: replyingTo,
+    }));
     setSending(false);
   };
 
-  // ── Header ────────────────────────────────────────────────────────────────
-  const headerName = isGroup
-    ? conversation.groupName
-    : otherUser?.displayName ?? "Chat";
+  // ── File upload ────────────────────────────────────────────────────────────
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState(null);
 
-  const headerInitials = headerName
-    ?.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
+  const handleFileSelect = async (file) => {
+    if (!conversation?.id || !currentUser?.uid) return;
+    setUploading(true);
+    setUploadError(null);
+    setUploadProgress(0);
+    try {
+      const { downloadURL, mediaType, fileName, fileSize } = await uploadFile(
+        file,
+        conversation.id,
+        currentUser.uid,
+        setUploadProgress
+      );
+      await dispatch(sendMessageAsync({
+        conversationId: conversation.id,
+        senderId: currentUser.uid,
+        text: "",
+        mediaURL: downloadURL,
+        mediaType,
+        fileName,
+        fileSize,
+        replyTo: replyingTo,
+      }));
+    } catch (err) {
+      console.error("[MessagePanel] upload failed:", err);
+      setUploadError(err.message ?? "Upload failed.");
+      setTimeout(() => setUploadError(null), 6000);
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
 
+  // ── Gallery drawer ─────────────────────────────────────────────────────────
+  const [showGallery, setShowGallery] = useState(false);
+
+  // ── Header info ────────────────────────────────────────────────────────────
+  const headerName = isGroup ? conversation.groupName : otherUser?.displayName ?? "Chat";
+  const headerInitials = headerName?.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
   const memberCount = conversation?.members?.length ?? 0;
-
-  // Status line for DM header
   const dmStatusLine = (() => {
     if (!otherStatus) return null;
     if (otherStatus.isOnline) return { text: "Online", color: "text-emerald-500" };
-    const lastSeenText = formatLastSeen(otherStatus.lastSeen);
-    return lastSeenText ? { text: lastSeenText, color: "text-muted-foreground" } : null;
+    const t = formatLastSeen(otherStatus.lastSeen);
+    return t ? { text: t, color: "text-muted-foreground" } : null;
   })();
 
   const grouped = groupMessages(messages);
@@ -124,55 +155,55 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
   return (
     <div className="flex flex-col h-full bg-background">
       {/* ── Header ── */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-card">
-        {/* Avatar */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-card shrink-0">
         <div className={`w-9 h-9 flex items-center justify-center shrink-0 bg-primary/20
           ${isGroup ? "rounded-xl border border-primary/20" : "rounded-full"}`}>
           <span className="text-sm font-semibold text-primary">{headerInitials}</span>
         </div>
 
-        {/* Name + status */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">{headerName}</p>
-          {isGroup ? (
-            <p className="text-xs text-muted-foreground">
-              {memberCount} member{memberCount !== 1 ? "s" : ""}
-            </p>
-          ) : dmStatusLine ? (
-            <p className={`text-xs font-medium ${dmStatusLine.color}`}>{dmStatusLine.text}</p>
-          ) : null}
+          {isGroup
+            ? <p className="text-xs text-muted-foreground">{memberCount} member{memberCount !== 1 ? "s" : ""}</p>
+            : dmStatusLine
+            ? <p className={`text-xs font-medium ${dmStatusLine.color}`}>{dmStatusLine.text}</p>
+            : null}
         </div>
 
-        {/* Actions */}
         <div className="flex items-center gap-1">
+          {/* Media gallery button — always shown */}
+          <button
+            id="media-gallery-btn"
+            onClick={() => setShowGallery(true)}
+            title="Shared media"
+            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+              <path d="M21 15l-5-5L5 21"/>
+            </svg>
+            {mediaMessages.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] flex items-center justify-center font-bold">
+                {mediaMessages.length > 9 ? "9+" : mediaMessages.length}
+              </span>
+            )}
+          </button>
+
           {isGroup ? (
-            <button
-              id="group-info-btn"
-              onClick={onShowGroupInfo}
-              title="Group info"
-              className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
+            <button id="group-info-btn" onClick={onShowGroupInfo} title="Group info" className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
             </button>
           ) : (
-            // Online indicator dot in header
-            <div
-              className={`w-2 h-2 rounded-full transition-colors ${
-                otherStatus?.isOnline ? "bg-emerald-500" : "bg-muted-foreground/40"
-              }`}
-              title={otherStatus?.isOnline ? "Online" : "Offline"}
-            />
+            <div className={`w-2 h-2 rounded-full transition-colors ${otherStatus?.isOnline ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
           )}
         </div>
       </div>
 
       {/* ── Messages area ── */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 min-h-0">
         {messagesLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -195,9 +226,7 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
           grouped.map((group, gi) => {
             const isOwn = group[0].senderId === currentUser?.uid;
             const sender = userCache[group[0].senderId];
-            const senderName = isOwn
-              ? null
-              : sender?.displayName ?? group[0].senderId.slice(0, 8);
+            const senderName = isOwn ? null : sender?.displayName ?? group[0].senderId.slice(0, 8);
 
             return (
               <div key={gi} className="space-y-1">
@@ -216,20 +245,49 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── Typing indicator (shown above input, slides in) ── */}
-      <TypingIndicator
-        typingUids={typingUids}
-        userCache={userCache}
-        currentUserUid={currentUser?.uid}
-      />
+      {/* ── Typing indicator ── */}
+      <TypingIndicator typingUids={typingUids} userCache={userCache} currentUserUid={currentUser?.uid} />
+
+      {/* ── Upload progress bar ── */}
+      {uploading && (
+        <div className="flex items-center gap-3 px-5 py-2 border-t border-border bg-card/80">
+          <svg className="w-3.5 h-3.5 text-primary animate-pulse shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+          </svg>
+          <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-200"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground shrink-0 w-8 text-right">{uploadProgress}%</span>
+        </div>
+      )}
+
+      {/* ── Upload error ── */}
+      {uploadError && (
+        <div className="flex items-center gap-2 px-5 py-2 border-t border-border bg-destructive/10 text-destructive text-xs">
+          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          {uploadError}
+        </div>
+      )}
+
+      {/* ── Reply bar (above input) ── */}
+      <ReplyBar />
 
       {/* ── Input ── */}
       <MessageInput
         onSend={handleSend}
-        disabled={sending || messagesLoading}
+        onFileSelect={handleFileSelect}
+        disabled={sending || messagesLoading || uploading}
         conversationId={conversation?.id}
         uid={currentUser?.uid}
       />
+
+      {/* ── Media gallery drawer ── */}
+      {showGallery && <MediaGalleryDrawer onClose={() => setShowGallery(false)} />}
     </div>
   );
 };

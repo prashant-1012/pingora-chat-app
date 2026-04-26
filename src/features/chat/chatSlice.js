@@ -5,9 +5,22 @@ import { sendMessage } from "../../firebase/chatService";
 
 export const sendMessageAsync = createAsyncThunk(
   "chat/sendMessage",
-  async ({ conversationId, senderId, text }, { rejectWithValue }) => {
+  async (
+    { conversationId, senderId, text, mediaURL, mediaType, fileName, fileSize, replyTo },
+    { getState, dispatch, rejectWithValue }
+  ) => {
     try {
-      await sendMessage(conversationId, { senderId, text });
+      await sendMessage(conversationId, {
+        senderId,
+        text: text ?? "",
+        mediaURL: mediaURL ?? null,
+        mediaType: mediaType ?? null,
+        fileName: fileName ?? null,
+        fileSize: fileSize ?? null,
+        replyTo: replyTo ?? null,
+      });
+      // Clear reply-to after successful send
+      dispatch(clearReplyingTo());
     } catch (err) {
       console.error("[chatSlice] sendMessage failed:", err);
       return rejectWithValue(err.message);
@@ -19,47 +32,53 @@ export const sendMessageAsync = createAsyncThunk(
 const chatSlice = createSlice({
   name: "chat",
   initialState: {
-    // List of conversations the current user belongs to (serialized from Firestore)
     conversations: [],
     conversationsLoading: true,
 
-    // The conversation currently open in the message panel
     activeConversationId: null,
 
-    // Messages for the active conversation (serialized from Firestore)
     messages: [],
     messagesLoading: false,
 
-    // Cached user data for conversation participants (uid → {displayName, email, photoURL})
+    // Cached user data for conversation participants
     userCache: {},
 
-    // Error from sendMessage
+    // Phase 7: message being replied to
+    // { messageId, text, senderId, senderName } | null
+    replyingTo: null,
+
     error: null,
   },
   reducers: {
-    // Called by useConversations hook (onSnapshot)
     setConversations(state, action) {
       state.conversations = action.payload;
       state.conversationsLoading = false;
     },
 
-    // Called when user clicks a conversation in the sidebar
     setActiveConversation(state, action) {
       state.activeConversationId = action.payload;
       state.messages = [];
       state.messagesLoading = true;
+      state.replyingTo = null; // clear reply when switching conversations
     },
 
-    // Called by useMessages hook (onSnapshot)
     setMessages(state, action) {
       state.messages = action.payload;
       state.messagesLoading = false;
     },
 
-    // Cache a fetched user profile (to show names in conversations)
     cacheUser(state, action) {
-      const user = action.payload; // { uid, displayName, email, photoURL }
+      const user = action.payload;
       state.userCache[user.uid] = user;
+    },
+
+    // Phase 7: set the message being replied to
+    setReplyingTo(state, action) {
+      state.replyingTo = action.payload; // { messageId, text, senderId, senderName }
+    },
+
+    clearReplyingTo(state) {
+      state.replyingTo = null;
     },
 
     clearChat(state) {
@@ -68,14 +87,14 @@ const chatSlice = createSlice({
       state.messages = [];
       state.conversationsLoading = true;
       state.userCache = {};
+      state.replyingTo = null;
       state.error = null;
     },
   },
   extraReducers: (builder) => {
-    builder
-      .addCase(sendMessageAsync.rejected, (state, action) => {
-        state.error = action.payload;
-      });
+    builder.addCase(sendMessageAsync.rejected, (state, action) => {
+      state.error = action.payload;
+    });
   },
 });
 
@@ -84,6 +103,8 @@ export const {
   setActiveConversation,
   setMessages,
   cacheUser,
+  setReplyingTo,
+  clearReplyingTo,
   clearChat,
 } = chatSlice.actions;
 
@@ -98,3 +119,8 @@ export const selectActiveConversation = (state) =>
 export const selectMessages = (state) => state.chat.messages;
 export const selectMessagesLoading = (state) => state.chat.messagesLoading;
 export const selectUserCache = (state) => state.chat.userCache;
+export const selectReplyingTo = (state) => state.chat.replyingTo;
+
+// Media messages only (for gallery)
+export const selectMediaMessages = (state) =>
+  state.chat.messages.filter((m) => m.mediaURL);

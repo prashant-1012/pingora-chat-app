@@ -1,18 +1,20 @@
 // MessageInput — text input bar at the bottom of the message panel.
-// Phase 6: fires typing indicators via presenceService.
+// Phase 6: typing indicators. Phase 7: file attachment button + paste handler.
 
 import { useState, useRef, useEffect } from "react";
 import { setTypingStatus } from "../../firebase/presenceService";
+import { MAX_FILE_MB } from "../../firebase/storageService";
 
-const TYPING_TIMEOUT_MS = 2500; // clear typing indicator after 2.5s of silence
+const TYPING_TIMEOUT_MS = 2500;
 
-const MessageInput = ({ onSend, disabled, conversationId, uid }) => {
+const MessageInput = ({ onSend, onFileSelect, disabled, conversationId, uid }) => {
   const [text, setText] = useState("");
   const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const isTypingRef = useRef(false);
 
-  // Clear typing status on unmount or conversation change
+  // Clear typing on unmount or conversation change
   useEffect(() => {
     return () => {
       clearTimeout(typingTimeoutRef.current);
@@ -47,12 +49,10 @@ const MessageInput = ({ onSend, disabled, conversationId, uid }) => {
   const handleSend = () => {
     const trimmed = text.trim();
     if (!trimmed || disabled) return;
-    clearTyping(); // stop typing indicator when message is sent
+    clearTyping();
     onSend(trimmed);
     setText("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
   };
 
   const handleKeyDown = (e) => {
@@ -62,7 +62,6 @@ const MessageInput = ({ onSend, disabled, conversationId, uid }) => {
     }
   };
 
-  // Auto-grow textarea + fire typing signal
   const handleInput = (e) => {
     const ta = e.target;
     ta.style.height = "auto";
@@ -72,8 +71,49 @@ const MessageInput = ({ onSend, disabled, conversationId, uid }) => {
     else clearTyping();
   };
 
+  // Handle paste — if user pastes a file, treat it as an attachment
+  const handlePaste = (e) => {
+    const items = Array.from(e.clipboardData?.items ?? []);
+    const fileItem = items.find((item) => item.kind === "file");
+    if (fileItem) {
+      e.preventDefault();
+      const file = fileItem.getAsFile();
+      if (file && onFileSelect) onFileSelect(file);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file && onFileSelect) onFileSelect(file);
+    e.target.value = ""; // reset so same file can be selected again
+  };
+
   return (
-    <div className="flex items-end gap-3 px-4 py-3 border-t border-border bg-card">
+    <div className="flex items-end gap-2 px-4 py-3 border-t border-border bg-card">
+      {/* File attachment button */}
+      <button
+        id="attach-file-btn"
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={disabled}
+        title={`Attach file (max ${MAX_FILE_MB} MB)`}
+        className="p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 transition-colors shrink-0"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+      </button>
+
+      {/* Hidden file input — accepts everything */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="*/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
+      {/* Textarea */}
       <textarea
         id="message-input"
         ref={textareaRef}
@@ -81,11 +121,14 @@ const MessageInput = ({ onSend, disabled, conversationId, uid }) => {
         value={text}
         onChange={handleInput}
         onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
         disabled={disabled}
         placeholder="Type a message… (Enter to send)"
         className="flex-1 resize-none overflow-y-auto bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all disabled:opacity-50 leading-relaxed"
         style={{ maxHeight: "120px" }}
       />
+
+      {/* Send button */}
       <button
         id="send-message-btn"
         onClick={handleSend}
