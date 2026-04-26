@@ -76,9 +76,16 @@
 
 
 ## Phase 6: Presence System
-- [ ] Online/offline detection (Realtime DB or Firestore heartbeat)
-- [ ] Last seen timestamp
-- [ ] Typing indicators
+- [x] `presenceService.js` — initPresence (heartbeat + visibilitychange + beforeunload), subscribeToUserStatus, setTypingStatus, subscribeToTyping
+- [x] `presenceSlice.js` — userStatuses map, setUserStatus / clearPresence reducers + selectors
+- [x] `store.js` — presenceReducer added
+- [x] `usePresence.js` — initializes current user's heartbeat on mount, cleans up on logout
+- [x] `useUserStatus.js` — subscribes to any uid's online/offline status → Redux
+- [x] `TypingIndicator.jsx` — animated bouncing dots + smart pluralization
+- [x] `MessageInput.jsx` — fires setTypingStatus on keystrokes, clears after 2.5s silence or on send
+- [x] `MessagePanel.jsx` — shows Online/last-seen in DM header, subscribes to typing collection, renders TypingIndicator
+- [x] `ConversationItem.jsx` — green/gray online dot on avatar for DM conversations
+- [x] `ChatPage.jsx` — calls usePresence, subscribes to all DM partner statuses in sidebar
 
 ## Phase 7: Rich Features
 - [ ] File/image upload (Firebase Storage)

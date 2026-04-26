@@ -1,35 +1,34 @@
 // ConversationItem — a single row in the sidebar conversation list.
+// Phase 6: shows online status dot for direct conversation partners.
 
 import { useSelector } from "react-redux";
 import { selectCurrentUser } from "../../features/auth/authSlice";
 import { selectUserCache } from "../../features/chat/chatSlice";
+import { selectUserStatuses } from "../../features/presence/presenceSlice";
 
 const initials = (name) =>
-  name
-    ?.split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "?";
+  name?.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
 
 const formatTime = (isoString) => {
   if (!isoString) return "";
   const date = new Date(isoString);
   const now = new Date();
   const isToday = date.toDateString() === now.toDateString();
-  if (isToday) {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
+  if (isToday) return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
 };
 
 const ConversationItem = ({ conversation, isActive, onClick }) => {
   const currentUser = useSelector(selectCurrentUser);
   const userCache = useSelector(selectUserCache);
+  const userStatuses = useSelector(selectUserStatuses);
 
-  // For direct chats, the "other" user's UID is whoever is not us
-  const otherUid = conversation.members?.find((uid) => uid !== currentUser?.uid);
-  const otherUser = userCache[otherUid];
+  const otherUid = conversation.type === "direct"
+    ? conversation.members?.find((uid) => uid !== currentUser?.uid)
+    : null;
+  const otherUser = otherUid ? userCache[otherUid] : null;
+  const otherStatus = otherUid ? userStatuses[otherUid] : null;
+  const isOtherOnline = otherStatus?.isOnline ?? false;
 
   const displayName =
     conversation.type === "group"
@@ -55,20 +54,28 @@ const ConversationItem = ({ conversation, isActive, onClick }) => {
           : "hover:bg-muted/60 border border-transparent"
         }`}
     >
-      {/* Avatar */}
-      <div
-        className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-semibold text-sm
-          ${isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
-      >
-        {avatarInitials}
+      {/* Avatar with online dot */}
+      <div className="relative shrink-0">
+        <div
+          className={`w-10 h-10 flex items-center justify-center font-semibold text-sm
+            ${conversation.type === "group" ? "rounded-xl" : "rounded-full"}
+            ${isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+        >
+          {avatarInitials}
+        </div>
+        {/* Online dot — only for direct conversations */}
+        {conversation.type === "direct" && (
+          <span
+            className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-card transition-colors
+              ${isOtherOnline ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
+          />
+        )}
       </div>
 
       {/* Text */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-1">
-          <span className={`text-sm font-medium truncate ${isActive ? "text-foreground" : "text-foreground"}`}>
-            {displayName}
-          </span>
+          <span className="text-sm font-medium text-foreground truncate">{displayName}</span>
           <span className="text-[10px] text-muted-foreground shrink-0">{lastMessageTime}</span>
         </div>
         <p className="text-xs text-muted-foreground truncate mt-0.5">{lastMessageText}</p>

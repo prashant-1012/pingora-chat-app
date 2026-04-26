@@ -1,20 +1,24 @@
 // ChatPage — the full two-panel chat application layout.
-// Phase 4: 1-on-1 messaging. Phase 5: Group chat + admin controls.
+// Phase 4: 1-on-1 messaging. Phase 5: Group chat. Phase 6: Presence.
 
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   selectActiveConversationId,
   selectActiveConversation,
+  selectConversations,
   selectUserCache,
   setActiveConversation,
   cacheUser,
   clearChat,
 } from "../features/chat/chatSlice";
+import { setUserStatus } from "../features/presence/presenceSlice";
 import { selectCurrentUser } from "../features/auth/authSlice";
 import useConversations from "../hooks/useConversations";
 import useMessages from "../hooks/useMessages";
+import usePresence from "../hooks/usePresence";
 import { getUsersByUids } from "../firebase/userService";
+import { subscribeToUserStatus } from "../firebase/presenceService";
 import Sidebar from "../components/chat/Sidebar";
 import MessagePanel from "../components/chat/MessagePanel";
 import EmptyState from "../components/chat/EmptyState";
@@ -26,29 +30,54 @@ const ChatPage = () => {
   const currentUser = useSelector(selectCurrentUser);
   const activeConversationId = useSelector(selectActiveConversationId);
   const activeConversation = useSelector(selectActiveConversation);
+  const conversations = useSelector(selectConversations);
   const userCache = useSelector(selectUserCache);
 
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
-  // Mobile: show sidebar ("sidebar") or messages ("messages")
   const [mobileView, setMobileView] = useState("sidebar");
 
-  // Subscribe to conversations and messages (real-time Firestore)
+  // ── Phase 6: Initialize current user's presence ────────────────────────────
+  usePresence(currentUser?.uid);
+
+  // ── Phase 4/5: Real-time conversations + messages ─────────────────────────
   useConversations(currentUser?.uid);
   useMessages(activeConversationId);
 
-  // When switching to a group conversation, fetch & cache all member profiles
+  // ── Phase 5: Fetch group members into cache when entering a group ─────────
   useEffect(() => {
     if (!activeConversation || activeConversation.type !== "group") return;
     const uncachedUids = (activeConversation.members ?? []).filter(
       (uid) => uid !== currentUser?.uid && !userCache[uid]
     );
     if (uncachedUids.length === 0) return;
-
     getUsersByUids(uncachedUids).then((users) => {
       users.forEach((u) => dispatch(cacheUser(u)));
     });
-  }, [activeConversationId, activeConversation, currentUser?.uid]); // eslint-disable-line
+  }, [activeConversationId]); // eslint-disable-line
+
+  // ── Phase 6: Subscribe to online status of all sidebar conversation partners
+  useEffect(() => {
+    if (!conversations.length) return;
+
+    // Collect unique UIDs from all DM conversations (not current user)
+    const dmUids = new Set();
+    conversations.forEach((conv) => {
+      if (conv.type === "direct") {
+        conv.members?.forEach((uid) => {
+          if (uid !== currentUser?.uid) dmUids.add(uid);
+        });
+      }
+    });
+
+    const unsubscribers = Array.from(dmUids).map((uid) =>
+      subscribeToUserStatus(uid, ({ isOnline, lastSeen }) => {
+        dispatch(setUserStatus({ uid, isOnline, lastSeen }));
+      })
+    );
+
+    return () => unsubscribers.forEach((unsub) => unsub());
+  }, [conversations, currentUser?.uid, dispatch]);
 
   // Close group info when switching conversations
   useEffect(() => {
@@ -61,14 +90,11 @@ const ChatPage = () => {
   };
 
   const handleLeaveGroup = () => {
-    // Leaving the group removes us — the conversation disappears from sidebar.
-    // Navigate back to empty state.
     dispatch(clearChat());
     setShowGroupInfo(false);
     setMobileView("sidebar");
   };
 
-  // The "other" user in a direct conversation (for MessagePanel header)
   const otherUid =
     activeConversation?.type === "direct"
       ? activeConversation.members?.find((uid) => uid !== currentUser?.uid)
@@ -122,7 +148,6 @@ const ChatPage = () => {
       {showNewChatModal && (
         <UserSearchModal onClose={() => setShowNewChatModal(false)} />
       )}
-
       {showGroupInfo && activeConversation?.type === "group" && (
         <GroupInfoPanel
           conversation={activeConversation}

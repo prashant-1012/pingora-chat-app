@@ -1,4 +1,5 @@
 // MessagePanel — the right side chat panel with header, messages, and input.
+// Phase 6: real-time online status in header + typing indicators above input.
 
 import { useRef, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -10,10 +11,15 @@ import {
   sendMessageAsync,
 } from "../../features/chat/chatSlice";
 import { selectCurrentUser } from "../../features/auth/authSlice";
+import { selectUserStatus } from "../../features/presence/presenceSlice";
+import { subscribeToTyping } from "../../firebase/presenceService";
+import useUserStatus from "../../hooks/useUserStatus";
 import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
+import TypingIndicator from "./TypingIndicator";
 
-// Group consecutive messages by the same sender
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 const groupMessages = (messages) => {
   const groups = [];
   messages.forEach((msg, i) => {
@@ -27,6 +33,20 @@ const groupMessages = (messages) => {
   return groups;
 };
 
+const formatLastSeen = (isoString) => {
+  if (!isoString) return null;
+  const date = new Date(isoString);
+  const diffMs = Date.now() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "last seen just now";
+  if (diffMins < 60) return `last seen ${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `last seen ${diffHours}h ago`;
+  return `last seen ${date.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
   const dispatch = useDispatch();
   const currentUser = useSelector(selectCurrentUser);
@@ -35,14 +55,39 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
   const messagesLoading = useSelector(selectMessagesLoading);
   const userCache = useSelector(selectUserCache);
 
-  const messagesEndRef = useRef(null);
-  const [sending, setSending] = useState(false);
+  const isGroup = conversation?.type === "group";
 
-  // Auto-scroll to bottom on new messages
+  // ── Online status (DM only) ──────────────────────────────────────────────
+  const otherUid = !isGroup
+    ? conversation?.members?.find((uid) => uid !== currentUser?.uid)
+    : null;
+
+  // Subscribe to the DM partner's status (no-op for groups)
+  useUserStatus(otherUid);
+  const otherStatus = useSelector(selectUserStatus(otherUid));
+
+  // ── Typing indicator ──────────────────────────────────────────────────────
+  const [typingUids, setTypingUids] = useState([]);
+
+  useEffect(() => {
+    if (!conversation?.id) return;
+    const unsubscribe = subscribeToTyping(conversation.id, (uids) => {
+      setTypingUids(uids);
+    });
+    return () => {
+      unsubscribe();
+      setTypingUids([]);
+    };
+  }, [conversation?.id]);
+
+  // ── Auto-scroll ───────────────────────────────────────────────────────────
+  const messagesEndRef = useRef(null);
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, typingUids]);
 
+  // ── Send ──────────────────────────────────────────────────────────────────
+  const [sending, setSending] = useState(false);
   const handleSend = async (text) => {
     if (!conversation || !text.trim()) return;
     setSending(true);
@@ -56,9 +101,7 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
     setSending(false);
   };
 
-  const isGroup = conversation?.type === "group";
-
-  // Header display info
+  // ── Header ────────────────────────────────────────────────────────────────
   const headerName = isGroup
     ? conversation.groupName
     : otherUser?.displayName ?? "Chat";
@@ -68,29 +111,41 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
 
   const memberCount = conversation?.members?.length ?? 0;
 
+  // Status line for DM header
+  const dmStatusLine = (() => {
+    if (!otherStatus) return null;
+    if (otherStatus.isOnline) return { text: "Online", color: "text-emerald-500" };
+    const lastSeenText = formatLastSeen(otherStatus.lastSeen);
+    return lastSeenText ? { text: lastSeenText, color: "text-muted-foreground" } : null;
+  })();
+
   const grouped = groupMessages(messages);
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-card">
-        <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${isGroup ? "rounded-xl bg-primary/15 border border-primary/20" : "rounded-full bg-primary/20"}`}>
+        {/* Avatar */}
+        <div className={`w-9 h-9 flex items-center justify-center shrink-0 bg-primary/20
+          ${isGroup ? "rounded-xl border border-primary/20" : "rounded-full"}`}>
           <span className="text-sm font-semibold text-primary">{headerInitials}</span>
         </div>
 
+        {/* Name + status */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">{headerName}</p>
           {isGroup ? (
-            <p className="text-xs text-muted-foreground">{memberCount} member{memberCount !== 1 ? "s" : ""}</p>
-          ) : otherUser?.email ? (
-            <p className="text-xs text-muted-foreground truncate">{otherUser.email}</p>
+            <p className="text-xs text-muted-foreground">
+              {memberCount} member{memberCount !== 1 ? "s" : ""}
+            </p>
+          ) : dmStatusLine ? (
+            <p className={`text-xs font-medium ${dmStatusLine.color}`}>{dmStatusLine.text}</p>
           ) : null}
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {isGroup ? (
-            // Group info button
             <button
               id="group-info-btn"
               onClick={onShowGroupInfo}
@@ -98,17 +153,25 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
               className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
             </button>
           ) : (
-            // Online indicator placeholder (Phase 6)
-            <div className="w-2 h-2 rounded-full bg-emerald-500" title="Online (Phase 6)" />
+            // Online indicator dot in header
+            <div
+              className={`w-2 h-2 rounded-full transition-colors ${
+                otherStatus?.isOnline ? "bg-emerald-500" : "bg-muted-foreground/40"
+              }`}
+              title={otherStatus?.isOnline ? "Online" : "Offline"}
+            />
           )}
         </div>
       </div>
 
-      {/* Messages area */}
+      {/* ── Messages area ── */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
         {messagesLoading ? (
           <div className="space-y-3">
@@ -132,7 +195,6 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
           grouped.map((group, gi) => {
             const isOwn = group[0].senderId === currentUser?.uid;
             const sender = userCache[group[0].senderId];
-            // In group chats, always show sender name for received messages
             const senderName = isOwn
               ? null
               : sender?.displayName ?? group[0].senderId.slice(0, 8);
@@ -154,8 +216,20 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <MessageInput onSend={handleSend} disabled={sending || messagesLoading} />
+      {/* ── Typing indicator (shown above input, slides in) ── */}
+      <TypingIndicator
+        typingUids={typingUids}
+        userCache={userCache}
+        currentUserUid={currentUser?.uid}
+      />
+
+      {/* ── Input ── */}
+      <MessageInput
+        onSend={handleSend}
+        disabled={sending || messagesLoading}
+        conversationId={conversation?.id}
+        uid={currentUser?.uid}
+      />
     </div>
   );
 };
