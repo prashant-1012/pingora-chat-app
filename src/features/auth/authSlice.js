@@ -56,8 +56,12 @@ const getFriendlyError = (code) => {
     "auth/invalid-credential": "Invalid email or password.",
     "auth/too-many-requests": "Too many attempts. Please try again later.",
     "auth/network-request-failed": "Network error. Check your connection.",
+    "auth/configuration-not-found":
+      "Firebase Auth is not configured. Enable Email/Password in Firebase Console → Authentication → Sign-in method.",
+    "auth/operation-not-allowed":
+      "Email/Password sign-in is disabled. Enable it in Firebase Console → Authentication → Sign-in method.",
   };
-  return map[code] || "Something went wrong. Please try again.";
+  return map[code] || `Something went wrong. (${code || "unknown"})`;
 };
 
 // ─── Slice ───────────────────────────────────────────────────────────────────

@@ -7,7 +7,6 @@ import {
   doc,
   addDoc,
   getDoc,
-  getDocs,
   setDoc,
   updateDoc,
   query,
@@ -20,19 +19,52 @@ import {
 } from "firebase/firestore";
 import { db } from "./config";
 
+// ─── Timestamp serializer ─────────────────────────────────────────────────────
+// Firestore Timestamp objects are not Redux-serializable.
+// We convert them to ISO strings immediately when reading from Firestore.
+export const serializeTimestamp = (ts) => {
+  if (!ts) return null;
+  if (ts.toDate) return ts.toDate().toISOString();
+  return ts;
+};
+
+const serializeConversation = (id, data) => ({
+  id,
+  type: data.type ?? "direct",
+  members: data.members ?? [],
+  groupName: data.groupName ?? null,
+  groupPhotoURL: data.groupPhotoURL ?? null,
+  adminId: data.adminId ?? null,
+  createdAt: serializeTimestamp(data.createdAt),
+  updatedAt: serializeTimestamp(data.updatedAt),
+  lastMessage: data.lastMessage
+    ? {
+        text: data.lastMessage.text ?? "",
+        senderId: data.lastMessage.senderId ?? "",
+        sentAt: serializeTimestamp(data.lastMessage.sentAt),
+      }
+    : null,
+});
+
+const serializeMessage = (id, data) => ({
+  id,
+  senderId: data.senderId ?? "",
+  text: data.text ?? "",
+  mediaURL: data.mediaURL ?? null,
+  mediaType: data.mediaType ?? null,
+  sentAt: serializeTimestamp(data.sentAt),
+  readBy: data.readBy ?? [],
+  reactions: data.reactions ?? {},
+});
+
 // ─── Conversations ────────────────────────────────────────────────────────────
 
 /**
  * Find an existing 1-on-1 conversation between two users, or create one.
  * Uses a deterministic conversation ID (sorted UIDs joined by "_") so we never
- * create duplicates — querying is not needed, we just check by known ID.
- *
- * @param {string} uid1 - Current user's UID
- * @param {string} uid2 - Other user's UID
- * @returns {string} conversationId
+ * create duplicates — no query needed, we just check by known ID.
  */
 export const getOrCreateDirectConversation = async (uid1, uid2) => {
-  // Deterministic ID: always sort UIDs so both users get the same doc ID
   const conversationId = [uid1, uid2].sort().join("_");
   const ref = doc(db, "conversations", conversationId);
   const snap = await getDoc(ref);
@@ -42,6 +74,7 @@ export const getOrCreateDirectConversation = async (uid1, uid2) => {
       type: "direct",
       members: [uid1, uid2],
       createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
       lastMessage: null,
     });
   }
@@ -51,12 +84,6 @@ export const getOrCreateDirectConversation = async (uid1, uid2) => {
 
 /**
  * Create a new group conversation.
- *
- * @param {object} params
- * @param {string} params.groupName
- * @param {string[]} params.memberUids - All member UIDs including the creator
- * @param {string} params.adminId - Creator's UID
- * @returns {string} conversationId
  */
 export const createGroupConversation = async ({ groupName, memberUids, adminId }) => {
   const ref = await addDoc(collection(db, "conversations"), {
@@ -66,27 +93,35 @@ export const createGroupConversation = async ({ groupName, memberUids, adminId }
     members: memberUids,
     adminId,
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
     lastMessage: null,
   });
   return ref.id;
 };
 
 /**
- * Subscribe to all conversations for a user.
- * Returns an unsubscribe function — call on unmount.
+ * Subscribe to all conversations for a user (real-time).
+ * Conversations are returned sorted by updatedAt (most recent first).
+ * Client-side sort to avoid requiring a Firestore composite index.
  *
  * @param {string} uid - Current user's UID
- * @param {function} callback - Called with conversations array on every update
+ * @param {function} callback - Called with serialized conversations array
+ * @returns {function} unsubscribe
  */
 export const subscribeToConversations = (uid, callback) => {
   const q = query(
     collection(db, "conversations"),
-    where("members", "array-contains", uid),
-    orderBy("lastMessage.sentAt", "desc")
+    where("members", "array-contains", uid)
   );
 
   return onSnapshot(q, (snap) => {
-    const conversations = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const conversations = snap.docs
+      .map((d) => serializeConversation(d.id, d.data()))
+      .sort((a, b) => {
+        const aTime = a.updatedAt ?? a.createdAt ?? "";
+        const bTime = b.updatedAt ?? b.createdAt ?? "";
+        return bTime.localeCompare(aTime); // most recent first
+      });
     callback(conversations);
   });
 };
@@ -95,20 +130,12 @@ export const subscribeToConversations = (uid, callback) => {
 
 /**
  * Send a message to a conversation.
- * Also updates the conversation's lastMessage field (for sidebar preview).
- *
- * @param {string} conversationId
- * @param {object} params
- * @param {string} params.senderId
- * @param {string} params.text
- * @param {string|null} params.mediaURL
- * @param {"image"|"file"|null} params.mediaType
+ * Also updates the conversation's lastMessage + updatedAt fields.
  */
 export const sendMessage = async (conversationId, { senderId, text, mediaURL = null, mediaType = null }) => {
   const messagesRef = collection(db, "conversations", conversationId, "messages");
   const conversationRef = doc(db, "conversations", conversationId);
 
-  // Write the message
   await addDoc(messagesRef, {
     senderId,
     text,
@@ -119,13 +146,13 @@ export const sendMessage = async (conversationId, { senderId, text, mediaURL = n
     reactions: {},
   });
 
-  // Update the conversation's lastMessage preview
   await updateDoc(conversationRef, {
     lastMessage: {
       text: text || (mediaType === "image" ? "📷 Photo" : "📎 File"),
       senderId,
       sentAt: serverTimestamp(),
     },
+    updatedAt: serverTimestamp(),
   });
 };
 
@@ -134,10 +161,10 @@ export const sendMessage = async (conversationId, { senderId, text, mediaURL = n
  * Returns unsubscribe function — call on unmount or conversation change.
  *
  * @param {string} conversationId
- * @param {function} callback - Called with messages array on every update
- * @param {number} messageLimit - Number of recent messages to load (default 50)
+ * @param {function} callback - Called with serialized messages array
+ * @param {number} messageLimit - Number of recent messages to load
  */
-export const subscribeToMessages = (conversationId, callback, messageLimit = 50) => {
+export const subscribeToMessages = (conversationId, callback, messageLimit = 100) => {
   const q = query(
     collection(db, "conversations", conversationId, "messages"),
     orderBy("sentAt", "asc"),
@@ -145,18 +172,13 @@ export const subscribeToMessages = (conversationId, callback, messageLimit = 50)
   );
 
   return onSnapshot(q, (snap) => {
-    const messages = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const messages = snap.docs.map((d) => serializeMessage(d.id, d.data()));
     callback(messages);
   });
 };
 
 /**
  * Mark a message as read by the current user.
- * Adds uid to the message's readBy array (no duplicates via arrayUnion).
- *
- * @param {string} conversationId
- * @param {string} messageId
- * @param {string} uid
  */
 export const markMessageAsRead = async (conversationId, messageId, uid) => {
   const ref = doc(db, "conversations", conversationId, "messages", messageId);

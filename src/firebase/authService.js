@@ -18,7 +18,13 @@ import { auth, db } from "./config";
  * 3. Writes a user document to Firestore `users/{uid}`.
  */
 export const registerUser = async ({ email, password, displayName }) => {
-  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  let userCredential;
+  try {
+    userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  } catch (err) {
+    console.error("[authService] createUserWithEmailAndPassword failed:", err.code, err.message);
+    throw err;
+  }
   const user = userCredential.user;
 
   // Set displayName on the Firebase Auth profile
@@ -44,8 +50,13 @@ export const registerUser = async ({ email, password, displayName }) => {
  * Sign in an existing user.
  */
 export const loginUser = async ({ email, password }) => {
-  const userCredential = await signInWithEmailAndPassword(auth, email, password);
-  return userCredential.user;
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
+  } catch (err) {
+    console.error("[authService] signInWithEmailAndPassword failed:", err.code, err.message);
+    throw err;
+  }
 };
 
 /**

@@ -1,39 +1,92 @@
-import { useSelector, useDispatch } from "react-redux";
-import { selectCurrentUser } from "../features/auth/authSlice";
-import { logoutAsync } from "../features/auth/authSlice";
+// ChatPage — the full two-panel chat application layout.
+// Phase 4: 1-on-1 messaging with real-time Firestore subscriptions.
 
-// Temporary placeholder — replaced with full chat UI in Phase 4.
+import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  selectActiveConversationId,
+  selectActiveConversation,
+  selectUserCache,
+  setActiveConversation,
+} from "../features/chat/chatSlice";
+import { selectCurrentUser } from "../features/auth/authSlice";
+import useConversations from "../hooks/useConversations";
+import useMessages from "../hooks/useMessages";
+import Sidebar from "../components/chat/Sidebar";
+import MessagePanel from "../components/chat/MessagePanel";
+import EmptyState from "../components/chat/EmptyState";
+import UserSearchModal from "../components/chat/UserSearchModal";
+
 const ChatPage = () => {
-  const currentUser = useSelector(selectCurrentUser);
   const dispatch = useDispatch();
+  const currentUser = useSelector(selectCurrentUser);
+  const activeConversationId = useSelector(selectActiveConversationId);
+  const activeConversation = useSelector(selectActiveConversation);
+  const userCache = useSelector(selectUserCache);
+
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  // Mobile: show sidebar ("sidebar") or messages ("messages")
+  const [mobileView, setMobileView] = useState("sidebar");
+
+  // Subscribe to conversations and messages (real-time Firestore)
+  useConversations(currentUser?.uid);
+  useMessages(activeConversationId);
+
+  const handleSelectConversation = (id) => {
+    dispatch(setActiveConversation(id));
+    setMobileView("messages");
+  };
+
+  // The "other" user in a direct conversation (for MessagePanel header)
+  const otherUid = activeConversation?.type === "direct"
+    ? activeConversation.members?.find((uid) => uid !== currentUser?.uid)
+    : null;
+  const otherUser = otherUid ? userCache[otherUid] : null;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6">
-      <div className="text-center space-y-2">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 mb-2">
-          <svg className="w-7 h-7 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-        </div>
-        <h1 className="text-2xl font-bold text-foreground">PINGORA</h1>
-        <p className="text-muted-foreground text-sm">
-          ✅ Authenticated as <span className="text-foreground font-medium">{currentUser?.displayName}</span>
-        </p>
-        <p className="text-xs text-muted-foreground">{currentUser?.email}</p>
-      </div>
-
-      <div className="bg-card border border-border rounded-2xl px-6 py-4 text-sm text-muted-foreground text-center max-w-sm">
-        <p>🔧 Chat UI coming in <strong className="text-foreground">Phase 4</strong>.</p>
-        <p className="mt-1">Auth is working — you can safely close and reopen the browser.</p>
-      </div>
-
-      <button
-        id="logout-btn"
-        onClick={() => dispatch(logoutAsync())}
-        className="px-5 py-2 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all"
+    <div className="h-screen flex overflow-hidden bg-background">
+      {/* ── Sidebar ─────────────────────────────── */}
+      <div
+        className={`
+          w-full md:w-80 lg:w-[320px] shrink-0 flex flex-col
+          ${mobileView === "messages" ? "hidden md:flex" : "flex"}
+        `}
       >
-        Sign out
-      </button>
+        <Sidebar onSelectConversation={handleSelectConversation} />
+      </div>
+
+      {/* ── Message panel ────────────────────────── */}
+      <div
+        className={`
+          flex-1 flex flex-col min-w-0
+          ${mobileView === "sidebar" ? "hidden md:flex" : "flex"}
+        `}
+      >
+        {/* Mobile back button */}
+        {mobileView === "messages" && (
+          <div className="flex md:hidden items-center gap-2 px-4 py-3 border-b border-border bg-card">
+            <button
+              onClick={() => setMobileView("sidebar")}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 12H5M12 5l-7 7 7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {activeConversationId ? (
+          <MessagePanel otherUser={otherUser} />
+        ) : (
+          <EmptyState onNewChat={() => setShowNewChatModal(true)} />
+        )}
+      </div>
+
+      {/* New chat modal (triggered from EmptyState) */}
+      {showNewChatModal && (
+        <UserSearchModal onClose={() => setShowNewChatModal(false)} />
+      )}
     </div>
   );
 };

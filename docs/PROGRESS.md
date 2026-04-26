@@ -40,19 +40,30 @@
 - [x] Update docs
 
 ## Phase 3: Firestore Data Model
-- [ ] Design users collection
-- [ ] Design conversations collection
-- [ ] Design messages sub-collection
-- [ ] Write Firestore data model to ARCHITECTURE.md
-- [ ] Seed test data
+- [x] Design users collection
+- [x] Design conversations collection
+- [x] Design messages sub-collection
+- [x] Write Firestore data model to ARCHITECTURE.md
+- [x] Create `firestore.rules` file in project root
+- [x] Create `scripts/seedFirestore.js` seed script
+- [x] Firestore database created in Firebase Console (test mode rules)
 
 ## Phase 4: 1-on-1 Chat
-- [ ] Create conversation logic
-- [ ] Send message
-- [ ] Real-time message subscription
-- [ ] Chat UI layout (sidebar + message panel)
-- [ ] Message timestamps
-- [ ] Auto-scroll to latest message
+- [x] `chatSlice.js` — conversations, messages, activeConversation, userCache
+- [x] `chatService.js` — getOrCreateDirectConversation, sendMessage, subscribeToConversations, subscribeToMessages
+- [x] `userService.js` — searchUserByEmail, getUserById
+- [x] `useConversations.js` hook — real-time Firestore onSnapshot → Redux
+- [x] `useMessages.js` hook — real-time messages onSnapshot → Redux
+- [x] `Sidebar.jsx` — conversation list, skeleton loader, empty state, new chat button
+- [x] `ConversationItem.jsx` — avatar, name, last message preview, timestamp
+- [x] `UserSearchModal.jsx` — search by email, start 1-on-1 conversation
+- [x] `MessagePanel.jsx` — chat header, scrollable message list, auto-scroll
+- [x] `MessageBubble.jsx` — own/received styling, hover timestamp
+- [x] `MessageInput.jsx` — auto-grow textarea, Enter to send, Shift+Enter for newline
+- [x] `EmptyState.jsx` — shown when no conversation selected
+- [x] `ChatPage.jsx` — two-panel layout, responsive mobile, real-time subscriptions wired
+- [x] `store.js` — chatReducer added
+- [x] Firestore Timestamps serialized to ISO strings (no Redux serialization errors)
 
 ## Phase 5: Group Chat
 - [ ] Create group conversation
