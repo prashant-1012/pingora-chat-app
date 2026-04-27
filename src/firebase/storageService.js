@@ -8,6 +8,7 @@ import {
   deleteObject,
 } from "firebase/storage";
 import { storage } from "./config";
+import { auth } from "./config";
 
 export const MAX_FILE_MB = 50;
 const MAX_BYTES = MAX_FILE_MB * 1024 * 1024;
@@ -49,6 +50,17 @@ export const formatFileSize = (bytes) => {
  */
 export const uploadFile = (file, conversationId, uid, onProgress) =>
   new Promise((resolve, reject) => {
+    // Guard: ensure user is authenticated before attempting upload
+
+    // 🔥 ADD THIS HERE
+    console.log("Current user:", auth.currentUser);
+    
+    if (!auth.currentUser) {
+      console.error("[Storage] Upload rejected: user is not authenticated.");
+      reject(new Error("You must be signed in to upload files."));
+      return;
+    }
+
     if (file.size > MAX_BYTES) {
       reject(new Error(`File too large. Maximum size is ${MAX_FILE_MB} MB.`));
       return;
@@ -59,22 +71,34 @@ export const uploadFile = (file, conversationId, uid, onProgress) =>
     const storageRef = ref(storage, path);
     const task = uploadBytesResumable(storageRef, file);
 
+    console.log("[Storage] Upload starting:", { path, size: file.size, type: file.type });
+
     task.on(
       "state_changed",
       (snap) => {
         const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        console.log("[Storage] Upload progress:", pct + "%");
         onProgress?.(pct);
       },
-      (err) => reject(err),
+      (err) => {
+        console.error("[Storage] Upload error:", err.code, err.message, err);
+        reject(err);
+      },
       async () => {
-        const downloadURL = await getDownloadURL(task.snapshot.ref);
-        resolve({
-          downloadURL,
-          mediaType: getMediaType(file),
-          fileName: file.name,
-          fileSize: file.size,
-          storagePath: path,
-        });
+        try {
+          const downloadURL = await getDownloadURL(task.snapshot.ref);
+          console.log("[Storage] Upload complete. URL:", downloadURL);
+          resolve({
+            downloadURL,
+            mediaType: getMediaType(file),
+            fileName: file.name,
+            fileSize: file.size,
+            storagePath: path,
+          });
+        } catch (err) {
+          console.error("[Storage] getDownloadURL failed:", err);
+          reject(err);
+        }
       }
     );
   });

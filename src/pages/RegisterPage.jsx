@@ -71,7 +71,7 @@ const RegisterPage = () => {
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">PINGORA</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-gradient">PINGORA</h1>
           <p className="text-muted-foreground mt-1 text-sm">Create your account and start chatting</p>
         </div>
 

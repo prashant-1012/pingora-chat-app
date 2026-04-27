@@ -120,24 +120,11 @@ const ChatPage = () => {
           ${mobileView === "sidebar" ? "hidden md:flex" : "flex"}
         `}
       >
-        {/* Mobile back button */}
-        {mobileView === "messages" && (
-          <div className="flex md:hidden items-center gap-2 px-4 py-3 border-b border-border bg-card">
-            <button
-              onClick={() => setMobileView("sidebar")}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 12H5M12 5l-7 7 7 7" />
-              </svg>
-            </button>
-          </div>
-        )}
-
         {activeConversationId ? (
           <MessagePanel
             otherUser={otherUser}
             onShowGroupInfo={() => setShowGroupInfo(true)}
+            onBack={mobileView === "messages" ? () => setMobileView("sidebar") : undefined}
           />
         ) : (
           <EmptyState onNewChat={() => setShowNewChatModal(true)} />

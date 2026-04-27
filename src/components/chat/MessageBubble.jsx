@@ -116,7 +116,7 @@ const MessageBubble = ({ message, isOwn, senderName, conversationId, showSeen, s
         <div
           className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed
             ${isOwn
-              ? "bg-primary text-primary-foreground rounded-br-sm"
+              ? "bubble-own text-white shadow-md shadow-primary/20 rounded-br-sm"
               : "bg-muted text-foreground rounded-bl-sm"
             }
             ${hasMedia && !hasText ? "p-0 overflow-hidden" : ""}

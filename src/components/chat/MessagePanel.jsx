@@ -53,7 +53,7 @@ const formatLastSeen = (isoString) => {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
+const MessagePanel = ({ otherUser, onShowGroupInfo, onBack }) => {
   const dispatch = useDispatch();
   const currentUser = useSelector(selectCurrentUser);
   const conversation = useSelector(selectActiveConversation);
@@ -129,6 +129,8 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
 
   const handleFileSelect = async (file) => {
     if (!conversation?.id || !currentUser?.uid) return;
+    console.log("[MessagePanel] File selected:", { name: file.name, size: file.size, type: file.type });
+    console.log("[MessagePanel] Upload context:", { conversationId: conversation.id, uid: currentUser.uid });
     setUploading(true);
     setUploadError(null);
     setUploadProgress(0);
@@ -150,7 +152,7 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
         replyTo: replyingTo,
       }));
     } catch (err) {
-      console.error("[MessagePanel] upload failed:", err);
+      console.error("[MessagePanel] Upload failed:", err.code, err.message, err);
       setUploadError(err.message ?? "Upload failed.");
       setTimeout(() => setUploadError(null), 6000);
     } finally {
@@ -178,10 +180,24 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
   return (
     <div className="flex flex-col h-full bg-background">
       {/* ── Header ── */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-card shrink-0">
-        <div className={`w-9 h-9 flex items-center justify-center shrink-0 bg-primary/20
-          ${isGroup ? "rounded-xl border border-primary/20" : "rounded-full"}`}>
-          <span className="text-sm font-semibold text-primary">{headerInitials}</span>
+      <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border bg-card shrink-0">
+        {/* Back button — mobile only */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="md:hidden p-1.5 -ml-1 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M19 12H5M12 5l-7 7 7 7" />
+            </svg>
+          </button>
+        )}
+        <div className={`w-9 h-9 flex items-center justify-center shrink-0
+          ${isGroup
+            ? "rounded-xl bg-gradient-to-br from-violet-500/20 to-primary/20 border border-primary/20"
+            : "rounded-full bg-gradient-to-br from-primary/20 to-violet-500/20"
+          }`}>
+          <span className="text-sm font-bold text-primary">{headerInitials}</span>
         </div>
 
         <div className="flex-1 min-w-0">

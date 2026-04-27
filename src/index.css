@@ -3,49 +3,69 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Light theme ─────────────────────────────────────────────────────────── */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 240 10% 97%;
+    --foreground: 240 10% 10%;
+
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 240 10% 10%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221 83% 53%;
-    --radius: 0.5rem;
+    --popover-foreground: 240 10% 10%;
+
+    /* Indigo primary — more premium than generic blue */
+    --primary: 243 75% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 243 40% 93%;
+    --secondary-foreground: 243 50% 30%;
+
+    --muted: 240 10% 93%;
+    --muted-foreground: 240 6% 48%;
+
+    --accent: 243 40% 93%;
+    --accent-foreground: 243 50% 30%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 10% 88%;
+    --input: 240 10% 88%;
+    --ring: 243 75% 58%;
+
+    --radius: 0.75rem;
   }
 
+  /* ── Dark theme ──────────────────────────────────────────────────────────── */
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --background: 230 22% 7%;
+    --foreground: 230 10% 94%;
+
+    --card: 230 22% 10%;
+    --card-foreground: 230 10% 94%;
+
+    --popover: 230 22% 11%;
+    --popover-foreground: 230 10% 94%;
+
+    --primary: 243 75% 65%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 230 22% 16%;
+    --secondary-foreground: 230 10% 80%;
+
+    --muted: 230 22% 13%;
+    --muted-foreground: 230 10% 54%;
+
+    --accent: 230 22% 16%;
+    --accent-foreground: 230 10% 80%;
+
+    --destructive: 0 62% 52%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 230 22% 16%;
+    --input: 230 22% 16%;
+    --ring: 243 75% 65%;
   }
 }
 
@@ -53,8 +73,42 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ── Premium scrollbar ───────────────────────────────────────────────────── */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+}
+
+@layer utilities {
+  /* Gradient text utility */
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-violet-500;
+  }
+
+  /* Own-message gradient bubble */
+  .bubble-own {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(243 75% 48%));
+  }
+
+  .dark .bubble-own {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(263 60% 58%));
   }
 }

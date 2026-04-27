@@ -119,16 +119,20 @@ export const subscribeToConversations = (uid, callback) => {
     where("members", "array-contains", uid)
   );
 
-  return onSnapshot(q, (snap) => {
-    const conversations = snap.docs
-      .map((d) => serializeConversation(d.id, d.data()))
-      .sort((a, b) => {
-        const aTime = a.updatedAt ?? a.createdAt ?? "";
-        const bTime = b.updatedAt ?? b.createdAt ?? "";
-        return bTime.localeCompare(aTime); // most recent first
-      });
-    callback(conversations);
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      const conversations = snap.docs
+        .map((d) => serializeConversation(d.id, d.data()))
+        .sort((a, b) => {
+          const aTime = a.updatedAt ?? a.createdAt ?? "";
+          const bTime = b.updatedAt ?? b.createdAt ?? "";
+          return bTime.localeCompare(aTime);
+        });
+      callback(conversations);
+    },
+    (err) => console.error("[chatService] subscribeToConversations error:", err.code, err.message)
+  );
 };
 
 // ─── Messages ────────────────────────────────────────────────────────────────
@@ -141,6 +145,7 @@ export const sendMessage = async (
   conversationId,
   { senderId, text, mediaURL = null, mediaType = null, fileName = null, fileSize = null, replyTo = null }
 ) => {
+  console.log("[chatService] sendMessage:", { conversationId, senderId, text, mediaType });
   const messagesRef = collection(db, "conversations", conversationId, "messages");
   const conversationRef = doc(db, "conversations", conversationId);
 
@@ -187,10 +192,14 @@ export const subscribeToMessages = (conversationId, callback, messageLimit = 100
     limit(messageLimit)
   );
 
-  return onSnapshot(q, (snap) => {
-    const messages = snap.docs.map((d) => serializeMessage(d.id, d.data()));
-    callback(messages);
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      const messages = snap.docs.map((d) => serializeMessage(d.id, d.data()));
+      callback(messages);
+    },
+    (err) => console.error("[chatService] subscribeToMessages error:", err.code, err.message)
+  );
 };
 
 /**

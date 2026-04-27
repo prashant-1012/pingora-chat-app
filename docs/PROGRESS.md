@@ -111,11 +111,19 @@
 - [ ] Background notifications
 
 ## Phase 9: UI Polish
-- [ ] Responsive layout (mobile-first)
-- [ ] Skeleton loaders
+- [x] `ThemeContext.jsx` — dark/light toggle with localStorage + system preference detection
+- [x] `main.jsx` — ThemeProvider wraps the app
+- [x] `index.css` — premium indigo palette (light + deep-navy dark), custom scrollbar, bubble-own gradient utility
+- [x] `Sidebar.jsx` — gradient logo icon, sun/moon theme toggle in footer, polished dropdown menu
+- [x] `ConversationItem.jsx` — gradient active avatar, premium active state styling
+- [x] `MessageBubble.jsx` — gradient own-message bubbles with shadow, premium look
+- [x] `MessagePanel.jsx` — back button integrated into header (fixes mobile double-header), debug logs for upload
+- [x] `ChatPage.jsx` — passes onBack prop to MessagePanel, removes separate mobile back-button strip
+- [x] `storageService.js` — upload debug logs (start, progress, error, complete)
+- [x] `storage.rules` — created with authenticated-user read/write rules (deploy to Firebase Console)
+- [x] `LoginPage.jsx` / `RegisterPage.jsx` — gradient PINGORA heading
+- [ ] Toast notifications (skipped per user request)
 - [ ] Error boundaries
-- [ ] Empty states
-- [ ] Toast notifications
 
 ## Phase 10: Security + Deployment
 - [ ] Firestore security rules

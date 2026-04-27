@@ -50,16 +50,19 @@ const ConversationItem = ({ conversation, isActive, onClick }) => {
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all text-left group
         ${isActive
-          ? "bg-primary/15 border border-primary/20"
-          : "hover:bg-muted/60 border border-transparent"
+          ? "bg-primary/12 border border-primary/25 shadow-sm"
+          : "hover:bg-muted/70 border border-transparent"
         }`}
     >
       {/* Avatar with online dot */}
       <div className="relative shrink-0">
         <div
-          className={`w-10 h-10 flex items-center justify-center font-semibold text-sm
+          className={`w-10 h-10 flex items-center justify-center font-bold text-sm
             ${conversation.type === "group" ? "rounded-xl" : "rounded-full"}
-            ${isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+            ${isActive
+              ? "bg-gradient-to-br from-primary to-violet-600 text-white shadow-md shadow-primary/30"
+              : "bg-muted text-muted-foreground"
+            }`}
         >
           {avatarInitials}
         </div>
