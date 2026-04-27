@@ -201,6 +201,17 @@ export const markMessageAsRead = async (conversationId, messageId, uid) => {
   await updateDoc(ref, { readBy: arrayUnion(uid) });
 };
 
+/**
+ * Toggle an emoji reaction on a message.
+ * add=true → arrayUnion(uid), add=false → arrayRemove(uid)
+ */
+export const toggleReaction = async (conversationId, messageId, uid, emoji, add) => {
+  const ref = doc(db, "conversations", conversationId, "messages", messageId);
+  await updateDoc(ref, {
+    [`reactions.${emoji}`]: add ? arrayUnion(uid) : arrayRemove(uid),
+  });
+};
+
 // ─── Group Management (Phase 5) ──────────────────────────────────────────────
 
 /**

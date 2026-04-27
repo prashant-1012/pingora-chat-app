@@ -1,19 +1,51 @@
 // MessageBubble — a single chat message bubble.
-// Phase 7: reply quotes, inline media, URL links, hover reply action.
+// Phase 7: reply quotes, inline media, URL links, hover reply action, emoji reactions, seen indicator.
 
+import { useState, useRef, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { setReplyingTo } from "../../features/chat/chatSlice";
-import { selectUserCache } from "../../features/chat/chatSlice";
+import { setReplyingTo, selectUserCache, toggleReactionAsync } from "../../features/chat/chatSlice";
+import { selectCurrentUser } from "../../features/auth/authSlice";
 import MediaMessage, { renderTextWithLinks } from "./MediaMessage";
+
+const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 const formatTime = (isoString) => {
   if (!isoString) return "";
   return new Date(isoString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
 
-const MessageBubble = ({ message, isOwn, senderName }) => {
+const EmojiPicker = ({ onSelect, onClose }) => {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className="absolute bottom-full mb-1 bg-card border border-border rounded-xl shadow-lg px-2 py-1.5 flex gap-1 z-20"
+    >
+      {EMOJIS.map((emoji) => (
+        <button
+          key={emoji}
+          onClick={() => { onSelect(emoji); onClose(); }}
+          className="text-base hover:scale-125 transition-transform leading-none p-0.5"
+        >
+          {emoji}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+const MessageBubble = ({ message, isOwn, senderName, conversationId, showSeen, seenByName }) => {
   const dispatch = useDispatch();
+  const currentUser = useSelector(selectCurrentUser);
   const userCache = useSelector(selectUserCache);
+  const [showPicker, setShowPicker] = useState(false);
 
   const hasMedia = !!message.mediaURL;
   const hasText = !!message.text;
@@ -39,6 +71,28 @@ const MessageBubble = ({ message, isOwn, senderName }) => {
       senderName: senderName ?? "Someone",
     }));
   };
+
+  const handleReaction = (emoji) => {
+    if (!conversationId || !currentUser?.uid) return;
+    const currentUids = message.reactions?.[emoji] ?? [];
+    const alreadyReacted = currentUids.includes(currentUser.uid);
+    dispatch(toggleReactionAsync({
+      conversationId,
+      messageId: message.id,
+      uid: currentUser.uid,
+      emoji,
+      add: !alreadyReacted,
+    }));
+  };
+
+  // Build reaction summary: [{ emoji, count, isMine }]
+  const reactionSummary = Object.entries(message.reactions ?? {})
+    .filter(([, uids]) => uids.length > 0)
+    .map(([emoji, uids]) => ({
+      emoji,
+      count: uids.length,
+      isMine: uids.includes(currentUser?.uid),
+    }));
 
   return (
     <div className={`flex items-end gap-2 group ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
@@ -96,25 +150,76 @@ const MessageBubble = ({ message, isOwn, senderName }) => {
           ) : null}
         </div>
 
-        {/* Timestamp — shown on hover */}
-        <span className="text-[10px] text-muted-foreground px-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {formatTime(message.sentAt)}
-        </span>
+        {/* ── Reactions row ── */}
+        {reactionSummary.length > 0 && (
+          <div className={`flex flex-wrap gap-1 px-1 ${isOwn ? "justify-end" : "justify-start"}`}>
+            {reactionSummary.map(({ emoji, count, isMine }) => (
+              <button
+                key={emoji}
+                onClick={() => handleReaction(emoji)}
+                className={`flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full border transition-colors
+                  ${isMine
+                    ? "bg-primary/10 border-primary/30 text-primary"
+                    : "bg-muted border-border text-muted-foreground hover:bg-muted/80"
+                  }`}
+              >
+                <span>{emoji}</span>
+                {count > 1 && <span className="font-medium">{count}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Timestamp + Seen ── */}
+        <div className={`flex items-center gap-1.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
+          <span className="text-[10px] text-muted-foreground">{formatTime(message.sentAt)}</span>
+          {isOwn && showSeen && (
+            <span className="text-[10px] text-primary font-medium">
+              Seen{seenByName ? ` by ${seenByName}` : ""}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Reply button — shown on hover */}
-      <button
-        onClick={handleReply}
-        title="Reply"
-        className={`p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 shrink-0 mb-1
-          ${isOwn ? "order-first" : ""}`}
+      {/* Action buttons — reply + emoji */}
+      <div className={`flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mb-1 relative
+        ${isOwn ? "order-first flex-row-reverse" : ""}`}
       >
-        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M9 17H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l4 4v5"/>
-          <path d="M16 17l-4 4-4-4"/>
-          <path d="M12 12v9"/>
-        </svg>
-      </button>
+        {/* Emoji picker trigger */}
+        <div className="relative">
+          <button
+            onClick={() => setShowPicker((v) => !v)}
+            title="React"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M8 13s1.5 2 4 2 4-2 4-2"/>
+              <line x1="9" y1="9" x2="9.01" y2="9"/>
+              <line x1="15" y1="9" x2="15.01" y2="9"/>
+            </svg>
+          </button>
+          {showPicker && (
+            <EmojiPicker
+              onSelect={handleReaction}
+              onClose={() => setShowPicker(false)}
+            />
+          )}
+        </div>
+
+        {/* Reply button */}
+        <button
+          onClick={handleReply}
+          title="Reply"
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 17H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l4 4v5"/>
+            <path d="M16 17l-4 4-4-4"/>
+            <path d="M12 12v9"/>
+          </svg>
+        </button>
+      </div>
     </div>
   );
 };

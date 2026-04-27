@@ -16,6 +16,7 @@ import {
 import { selectCurrentUser } from "../../features/auth/authSlice";
 import { selectUserStatus } from "../../features/presence/presenceSlice";
 import { subscribeToTyping } from "../../firebase/presenceService";
+import { markMessageAsRead } from "../../firebase/chatService";
 import { uploadFile } from "../../firebase/storageService";
 import useUserStatus from "../../hooks/useUserStatus";
 import MessageBubble from "./MessageBubble";
@@ -78,6 +79,28 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
     const unsub = subscribeToTyping(conversation.id, (uids) => setTypingUids(uids));
     return () => { unsub(); setTypingUids([]); };
   }, [conversation?.id]);
+
+  // ── Mark incoming messages as read (DM only) ──────────────────────────────
+  useEffect(() => {
+    if (!conversation?.id || !currentUser?.uid || isGroup) return;
+    const unread = messages.filter(
+      (m) => m.senderId !== currentUser.uid && !m.readBy?.includes(currentUser.uid)
+    );
+    unread.forEach((m) => markMessageAsRead(conversation.id, m.id, currentUser.uid).catch(() => {}));
+  }, [messages, conversation?.id, currentUser?.uid, isGroup]);
+
+  // ── Seen indicator — own last message seen by other user (DM only) ────────
+  const seenInfo = (() => {
+    if (isGroup || !otherUid) return {};
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.senderId === currentUser?.uid) {
+        const seen = m.readBy?.includes(otherUid);
+        return { seenMessageId: seen ? m.id : null, seenByName: otherUser?.displayName };
+      }
+    }
+    return {};
+  })();
 
   // ── Auto-scroll ────────────────────────────────────────────────────────────
   const messagesEndRef = useRef(null);
@@ -236,6 +259,9 @@ const MessagePanel = ({ otherUser, onShowGroupInfo }) => {
                     message={msg}
                     isOwn={isOwn}
                     senderName={senderName}
+                    conversationId={conversation?.id}
+                    showSeen={isOwn && seenInfo.seenMessageId === msg.id}
+                    seenByName={seenInfo.seenByName}
                   />
                 ))}
               </div>

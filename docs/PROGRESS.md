@@ -99,6 +99,11 @@
 - [x] `MessagePanel.jsx` — upload progress bar, upload error display, gallery button with media badge count, ReplyBar, passes replyingTo to all sends
 
 
+- [x] `chatService.js` — toggleReaction (emoji reactions, arrayUnion/arrayRemove per uid)
+- [x] `chatSlice.js` — toggleReactionAsync thunk
+- [x] `MessageBubble.jsx` — emoji picker popup (6 emojis), reaction row below bubble, toggle own reaction, Seen indicator on own last message
+- [x] `MessagePanel.jsx` — markMessageAsRead on incoming DM messages, seenInfo derived for own last bubble
+
 ## Phase 8: Push Notifications (FCM)
 - [ ] FCM token registration
 - [ ] Notification permission flow

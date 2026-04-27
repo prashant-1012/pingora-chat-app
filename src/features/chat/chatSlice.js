@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { sendMessage } from "../../firebase/chatService";
+import { sendMessage, toggleReaction } from "../../firebase/chatService";
 
 // ─── Async Thunks ─────────────────────────────────────────────────────────────
 
@@ -23,6 +23,17 @@ export const sendMessageAsync = createAsyncThunk(
       dispatch(clearReplyingTo());
     } catch (err) {
       console.error("[chatSlice] sendMessage failed:", err);
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const toggleReactionAsync = createAsyncThunk(
+  "chat/toggleReaction",
+  async ({ conversationId, messageId, uid, emoji, add }, { rejectWithValue }) => {
+    try {
+      await toggleReaction(conversationId, messageId, uid, emoji, add);
+    } catch (err) {
       return rejectWithValue(err.message);
     }
   }
