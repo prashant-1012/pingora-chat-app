@@ -18,7 +18,6 @@ import UserSearchModal from "./UserSearchModal";
 import CreateGroupModal from "./CreateGroupModal";
 import ProfileDrawer from "./ProfileDrawer";
 
-// ── Sun icon ──────────────────────────────────────────────────────────────────
 const SunIcon = () => (
   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="4"/>
@@ -26,13 +25,101 @@ const SunIcon = () => (
   </svg>
 );
 
-// ── Moon icon ─────────────────────────────────────────────────────────────────
 const MoonIcon = () => (
   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
   </svg>
 );
 
+// ── Mobile profile side drawer ────────────────────────────────────────────────
+const MobileProfileDrawer = ({ onClose, onEditProfile }) => {
+  const dispatch = useDispatch();
+  const currentUser = useSelector(selectCurrentUser);
+  const { photoURLs } = useProfilePics();
+  const { toggle: toggleTheme, isDark } = useTheme();
+  const [signingOut, setSigningOut] = useState(false);
+
+  const myInitials = currentUser?.displayName
+    ?.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    await dispatch(logoutAsync());
+    setSigningOut(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Drawer — slides in from left */}
+      <div className="relative z-10 w-72 max-w-[85vw] h-full bg-card flex flex-col shadow-2xl animate-slide-in-left">
+        {/* Drawer header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="text-base font-semibold text-foreground">My Profile</h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Avatar + name + email */}
+        <div className="flex flex-col items-center gap-3 px-5 py-6 border-b border-border">
+          <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-primary/30 shadow-md">
+            {photoURLs[currentUser?.uid] ? (
+              <img src={photoURLs[currentUser.uid]} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center">
+                <span className="text-xl font-bold text-white">{myInitials}</span>
+              </div>
+            )}
+          </div>
+          <div className="text-center min-w-0 w-full">
+            <p className="text-sm font-semibold text-foreground truncate">{currentUser?.displayName}</p>
+            <p className="text-xs text-muted-foreground truncate mt-0.5">{currentUser?.email}</p>
+          </div>
+          <button
+            onClick={() => { onClose(); onEditProfile(); }}
+            className="w-full py-2 rounded-xl bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
+          >
+            Edit profile
+          </button>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col gap-1 px-3 py-4">
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-foreground hover:bg-muted transition-colors text-left"
+          >
+            <span className="text-muted-foreground">{isDark ? <SunIcon /> : <MoonIcon />}</span>
+            <span className="text-sm font-medium">{isDark ? "Light mode" : "Dark mode"}</span>
+          </button>
+
+          {/* Sign out */}
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-destructive hover:bg-destructive/10 transition-colors text-left disabled:opacity-50"
+          >
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+            </svg>
+            <span className="text-sm font-medium">{signingOut ? "Signing out…" : "Sign out"}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
 const Sidebar = ({ onSelectConversation }) => {
   const dispatch = useDispatch();
   const { toggle: toggleTheme, isDark } = useTheme();
@@ -46,6 +133,7 @@ const Sidebar = ({ onSelectConversation }) => {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showMobileDrawer, setShowMobileDrawer] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -98,14 +186,39 @@ const Sidebar = ({ onSelectConversation }) => {
   const myInitials = currentUser?.displayName
     ?.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
 
+  const AvatarButton = ({ onClick, className = "", size = "w-8 h-8", textSize = "text-xs" }) => (
+    <button
+      onClick={onClick}
+      title="My profile"
+      className={`${size} rounded-full overflow-hidden shrink-0 focus:outline-none ${className}`}
+    >
+      {photoURLs[currentUser?.uid] ? (
+        <img src={photoURLs[currentUser.uid]} alt="Profile" className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center">
+          <span className={`${textSize} font-bold text-white`}>{myInitials}</span>
+        </div>
+      )}
+    </button>
+  );
+
   return (
     <>
       <aside className="flex flex-col h-full w-full border-r border-border bg-card">
         {/* ── Header ── */}
         <div className="flex items-center gap-3 px-4 py-4 border-b border-border bg-card">
-          {/* Brand */}
+          {/* Mobile only: profile avatar button */}
+          <div className="md:hidden w-8 h-8 shrink-0 relative">
+            <span className="absolute inset-0 rounded-full bg-primary/40 pointer-events-none" />
+            <AvatarButton
+              onClick={() => setShowMobileDrawer(true)}
+              className="absolute inset-0 ring-2 ring-primary shadow-md shadow-primary/30"
+            />
+          </div>
+
+          {/* Brand — icon desktop only, text always */}
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center shrink-0 shadow-md shadow-primary/30">
+            <div className="hidden md:flex w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-violet-600 items-center justify-center shrink-0 shadow-md shadow-primary/30">
               <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
@@ -216,30 +329,18 @@ const Sidebar = ({ onSelectConversation }) => {
           )}
         </div>
 
-        {/* ── Footer ── */}
-        <div className="flex items-center gap-2.5 px-4 py-3 border-t border-border bg-card sticky bottom-0">
-          {/* Avatar — click to open profile */}
-          <button
+        {/* ── Footer — desktop only ── */}
+        <div className="hidden md:flex items-center gap-2.5 px-4 py-3 border-t border-border bg-card sticky bottom-0">
+          <AvatarButton
             onClick={() => setShowProfile(true)}
-            title="Edit profile"
-            className="w-8 h-8 rounded-full overflow-hidden shrink-0 shadow-sm ring-2 ring-transparent hover:ring-primary/50 transition-all focus:outline-none"
-          >
-            {photoURLs[currentUser?.uid] ? (
-              <img src={photoURLs[currentUser.uid]} alt="Profile" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center">
-                <span className="text-xs font-bold text-white">{myInitials}</span>
-              </div>
-            )}
-          </button>
+            className="ring-2 ring-transparent hover:ring-primary/50 transition-all shadow-sm"
+          />
 
-          {/* Name + email */}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground truncate leading-tight">{currentUser?.displayName}</p>
             <p className="text-[10px] text-muted-foreground truncate">{currentUser?.email}</p>
           </div>
 
-          {/* Theme toggle */}
           <button
             onClick={toggleTheme}
             title={isDark ? "Switch to light mode" : "Switch to dark mode"}
@@ -248,7 +349,6 @@ const Sidebar = ({ onSelectConversation }) => {
             {isDark ? <SunIcon /> : <MoonIcon />}
           </button>
 
-          {/* Sign out */}
           <button
             id="sidebar-logout-btn"
             onClick={handleSignOut}
@@ -266,6 +366,12 @@ const Sidebar = ({ onSelectConversation }) => {
       {showDmModal && <UserSearchModal onClose={() => setShowDmModal(false)} />}
       {showGroupModal && <CreateGroupModal onClose={() => setShowGroupModal(false)} />}
       {showProfile && <ProfileDrawer onClose={() => setShowProfile(false)} />}
+      {showMobileDrawer && (
+        <MobileProfileDrawer
+          onClose={() => setShowMobileDrawer(false)}
+          onEditProfile={() => setShowProfile(true)}
+        />
+      )}
     </>
   );
 };

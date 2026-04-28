@@ -7,8 +7,10 @@ import {
   doc,
   addDoc,
   getDoc,
+  getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -218,6 +220,20 @@ export const toggleReaction = async (conversationId, messageId, uid, emoji, add)
   const ref = doc(db, "conversations", conversationId, "messages", messageId);
   await updateDoc(ref, {
     [`reactions.${emoji}`]: add ? arrayUnion(uid) : arrayRemove(uid),
+  });
+};
+
+/**
+ * Delete every message in a conversation and clear the lastMessage preview.
+ * Affects all participants immediately via the shared real-time listener.
+ */
+export const clearAllMessages = async (conversationId) => {
+  const messagesRef = collection(db, "conversations", conversationId, "messages");
+  const snap = await getDocs(messagesRef);
+  await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+  await updateDoc(doc(db, "conversations", conversationId), {
+    lastMessage: null,
+    updatedAt: serverTimestamp(),
   });
 };
 

@@ -16,7 +16,7 @@ import {
 import { selectCurrentUser } from "../../features/auth/authSlice";
 import { selectUserStatus } from "../../features/presence/presenceSlice";
 import { subscribeToTyping } from "../../firebase/presenceService";
-import { markMessageAsRead } from "../../firebase/chatService";
+import { markMessageAsRead, clearAllMessages } from "../../firebase/chatService";
 // import { uploadFile } from "../../firebase/storageService"; // Phase 7
 import useUserStatus from "../../hooks/useUserStatus";
 import MessageBubble from "./MessageBubble";
@@ -108,6 +108,23 @@ const MessagePanel = ({ otherUser, onShowGroupInfo, onBack }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUids]);
 
+  // ── Clear messages ─────────────────────────────────────────────────────────
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  const handleClearMessages = async () => {
+    if (!conversation?.id) return;
+    setClearing(true);
+    try {
+      await clearAllMessages(conversation.id);
+    } catch (err) {
+      console.error("[MessagePanel] clear failed:", err);
+    } finally {
+      setClearing(false);
+      setShowClearConfirm(false);
+    }
+  };
+
   // ── Text send ──────────────────────────────────────────────────────────────
   const [sending, setSending] = useState(false);
   const handleSend = async (text) => {
@@ -174,7 +191,16 @@ const MessagePanel = ({ otherUser, onShowGroupInfo, onBack }) => {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Phase 7 — media gallery button removed until CORS is fixed */}
+          {/* Clear messages button */}
+          <button
+            onClick={() => setShowClearConfirm(true)}
+            title="Clear all messages"
+            className="p-2 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </button>
 
           {isGroup ? (
             <button id="group-info-btn" onClick={onShowGroupInfo} title="Group info" className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
@@ -250,6 +276,43 @@ const MessagePanel = ({ otherUser, onShowGroupInfo, onBack }) => {
         conversationId={conversation?.id}
         uid={currentUser?.uid}
       />
+
+      {/* ── Clear messages confirm modal ── */}
+      {showClearConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={(e) => e.target === e.currentTarget && setShowClearConfirm(false)}
+        >
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowClearConfirm(false)} />
+          <div className="relative z-10 w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl p-6">
+            {/* Icon */}
+            <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-destructive" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+            </div>
+            <h2 className="text-base font-semibold text-foreground text-center mb-1">Clear all messages?</h2>
+            <p className="text-sm text-muted-foreground text-center mb-6">
+              This will permanently delete all messages for <strong>both sides</strong> of this conversation. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearMessages}
+                disabled={clearing}
+                className="flex-1 py-2.5 rounded-xl bg-destructive text-white text-sm font-medium hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+              >
+                {clearing ? "Clearing…" : "Clear messages"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

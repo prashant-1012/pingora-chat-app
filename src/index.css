@@ -111,4 +111,14 @@
   .dark .bubble-own {
     background: linear-gradient(135deg, hsl(var(--primary)), hsl(263 60% 58%));
   }
+
+  /* Mobile profile drawer slide-in */
+  .animate-slide-in-left {
+    animation: slideInLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
 }
