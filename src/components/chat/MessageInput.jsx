@@ -104,7 +104,7 @@ const MessageInput = ({ onSend, /* onFileSelect, */ disabled, conversationId, ui
         onKeyDown={handleKeyDown}
         // onPaste={handlePaste} // Phase 7
         disabled={disabled}
-        placeholder="Type a message… (Enter to send)"
+        placeholder="Type a message…"
         className="flex-1 resize-none overflow-y-auto bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all disabled:opacity-50 leading-relaxed"
         style={{ maxHeight: "120px" }}
       />

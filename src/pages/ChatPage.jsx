@@ -106,7 +106,7 @@ const ChatPage = () => {
       {/* ── Sidebar ─────────────────────────────── */}
       <div
         className={`
-          w-full md:w-80 lg:w-[320px] shrink-0 flex flex-col
+          w-full md:w-80 lg:w-[320px] shrink-0 flex flex-col overflow-hidden
           ${mobileView === "messages" ? "hidden md:flex" : "flex"}
         `}
       >

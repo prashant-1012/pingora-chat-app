@@ -217,7 +217,7 @@ const Sidebar = ({ onSelectConversation }) => {
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex items-center gap-2.5 px-4 py-3 border-t border-border bg-card">
+        <div className="flex items-center gap-2.5 px-4 py-3 border-t border-border bg-card sticky bottom-0">
           {/* Avatar — click to open profile */}
           <button
             onClick={() => setShowProfile(true)}
