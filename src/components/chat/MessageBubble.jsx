@@ -192,7 +192,7 @@ const MessageBubble = ({ message, isOwn, senderName, conversationId, showSeen, s
 
       {/* Action buttons — reply + emoji */}
       <div className={`flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mb-1 relative
-        ${isOwn ? "order-first flex-row-reverse" : ""}`}
+        ${isOwn ? "order-last" : ""}`}
       >
         {/* Emoji picker trigger */}
         <div className="relative">

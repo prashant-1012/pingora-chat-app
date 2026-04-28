@@ -102,7 +102,7 @@ const ChatPage = () => {
   const otherUser = otherUid ? userCache[otherUid] : null;
 
   return (
-    <div className="h-screen flex overflow-hidden bg-background">
+    <div className="h-screen h-dvh flex overflow-hidden bg-background">
       {/* ── Sidebar ─────────────────────────────── */}
       <div
         className={`
