@@ -12,9 +12,11 @@ import { selectCurrentUser } from "../../features/auth/authSlice";
 import { logoutAsync } from "../../features/auth/authSlice";
 import { getUserById } from "../../firebase/userService";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useProfilePics } from "../../contexts/ProfileContext";
 import ConversationItem from "./ConversationItem";
 import UserSearchModal from "./UserSearchModal";
 import CreateGroupModal from "./CreateGroupModal";
+import ProfileDrawer from "./ProfileDrawer";
 
 // ── Sun icon ──────────────────────────────────────────────────────────────────
 const SunIcon = () => (
@@ -39,9 +41,11 @@ const Sidebar = ({ onSelectConversation }) => {
   const conversationsLoading = useSelector(selectConversationsLoading);
   const activeConversationId = useSelector(selectActiveConversationId);
 
+  const { photoURLs } = useProfilePics();
   const [showDmModal, setShowDmModal] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -54,6 +58,17 @@ const Sidebar = ({ onSelectConversation }) => {
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Press '+' to open new message search
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "+" && !e.ctrlKey && !e.metaKey && !["INPUT", "TEXTAREA"].includes(e.target.tagName)) {
+        setShowDmModal(true);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
   }, []);
 
   // Fetch + cache user profiles for all conversation participants
@@ -148,12 +163,15 @@ const Sidebar = ({ onSelectConversation }) => {
 
         {/* ── Search hint ── */}
         <div className="px-4 pt-3 pb-1">
-          <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-xl text-muted-foreground text-xs">
+          <button
+            onClick={() => setShowDmModal(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 bg-muted rounded-xl text-muted-foreground text-xs hover:bg-muted/80 hover:text-foreground transition-colors text-left"
+          >
             <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
             </svg>
             <span>Press + to search people</span>
-          </div>
+          </button>
         </div>
 
         {/* ── Conversations list ── */}
@@ -200,10 +218,20 @@ const Sidebar = ({ onSelectConversation }) => {
 
         {/* ── Footer ── */}
         <div className="flex items-center gap-2.5 px-4 py-3 border-t border-border bg-card">
-          {/* Avatar */}
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center shrink-0 shadow-sm">
-            <span className="text-xs font-bold text-white">{myInitials}</span>
-          </div>
+          {/* Avatar — click to open profile */}
+          <button
+            onClick={() => setShowProfile(true)}
+            title="Edit profile"
+            className="w-8 h-8 rounded-full overflow-hidden shrink-0 shadow-sm ring-2 ring-transparent hover:ring-primary/50 transition-all focus:outline-none"
+          >
+            {photoURLs[currentUser?.uid] ? (
+              <img src={photoURLs[currentUser.uid]} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center">
+                <span className="text-xs font-bold text-white">{myInitials}</span>
+              </div>
+            )}
+          </button>
 
           {/* Name + email */}
           <div className="flex-1 min-w-0">
@@ -237,6 +265,7 @@ const Sidebar = ({ onSelectConversation }) => {
 
       {showDmModal && <UserSearchModal onClose={() => setShowDmModal(false)} />}
       {showGroupModal && <CreateGroupModal onClose={() => setShowGroupModal(false)} />}
+      {showProfile && <ProfileDrawer onClose={() => setShowProfile(false)} />}
     </>
   );
 };

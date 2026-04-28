@@ -8,6 +8,7 @@ import {
   getDocs,
   getDoc,
   doc,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "./config";
 
@@ -52,5 +53,9 @@ export const getUsersByUids = async (uids) => {
   if (!uids?.length) return [];
   const results = await Promise.all(uids.map((uid) => getUserById(uid)));
   return results.filter(Boolean);
+};
+
+export const updateUserDisplayName = async (uid, displayName) => {
+  await updateDoc(doc(db, "users", uid), { displayName });
 };
 

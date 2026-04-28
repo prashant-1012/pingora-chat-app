@@ -86,6 +86,11 @@ const authSlice = createSlice({
     clearError(state) {
       state.error = null;
     },
+    updateDisplayName(state, action) {
+      if (state.currentUser) {
+        state.currentUser = { ...state.currentUser, displayName: action.payload };
+      }
+    },
   },
   extraReducers: (builder) => {
     // ── Register ──
@@ -134,7 +139,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { setUser, clearError } = authSlice.actions;
+export const { setUser, clearError, updateDisplayName } = authSlice.actions;
 export default authSlice.reducer;
 
 // ─── Selectors ───────────────────────────────────────────────────────────────

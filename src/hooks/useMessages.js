@@ -25,9 +25,9 @@ const useMessages = (conversationId) => {
 
     return () => {
       unsubscribe();
-      // Clear messages when switching conversations so stale data
-      // doesn't flash while the new subscription loads.
-      dispatch(setMessages([]));
+      // setActiveConversation already clears messages and sets messagesLoading=true,
+      // so we must NOT dispatch setMessages([]) here — it would race and reset
+      // messagesLoading to false before the new subscription's first callback fires.
     };
   }, [conversationId, dispatch]);
 };

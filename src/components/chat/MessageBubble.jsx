@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { setReplyingTo, selectUserCache, toggleReactionAsync } from "../../features/chat/chatSlice";
 import { selectCurrentUser } from "../../features/auth/authSlice";
+import { useProfilePics } from "../../contexts/ProfileContext";
 import MediaMessage, { renderTextWithLinks } from "./MediaMessage";
 
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
@@ -45,7 +46,15 @@ const MessageBubble = ({ message, isOwn, senderName, conversationId, showSeen, s
   const dispatch = useDispatch();
   const currentUser = useSelector(selectCurrentUser);
   const userCache = useSelector(selectUserCache);
+  const { photoURLs } = useProfilePics();
   const [showPicker, setShowPicker] = useState(false);
+
+  const senderPhoto = isOwn
+    ? photoURLs[currentUser?.uid] ?? null
+    : photoURLs[message.senderId] ?? null;
+  const senderInitial = isOwn
+    ? currentUser?.displayName?.[0]?.toUpperCase() ?? "?"
+    : senderName?.[0]?.toUpperCase() ?? "?";
 
   const hasMedia = !!message.mediaURL;
   const hasText = !!message.text;
@@ -96,17 +105,17 @@ const MessageBubble = ({ message, isOwn, senderName, conversationId, showSeen, s
 
   return (
     <div className={`flex items-end gap-2 group ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
-      {/* Avatar — received messages only */}
-      {!isOwn && (
-        <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center shrink-0 mb-0.5">
-          <span className="text-[10px] font-semibold text-muted-foreground">
-            {senderName?.[0]?.toUpperCase() ?? "?"}
-          </span>
-        </div>
-      )}
+      {/* Avatar */}
+      <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 mb-0.5 bg-muted flex items-center justify-center">
+        {senderPhoto ? (
+          <img src={senderPhoto} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-[10px] font-semibold text-muted-foreground">{senderInitial}</span>
+        )}
+      </div>
 
       {/* Bubble content column */}
-      <div className={`flex flex-col gap-0.5 max-w-[70%] ${isOwn ? "items-end" : "items-start"}`}>
+      <div className={`flex flex-col gap-0.5 max-w-[70%] min-w-0 ${isOwn ? "items-end" : "items-start"}`}>
         {/* Sender name (group received) */}
         {!isOwn && senderName && (
           <span className="text-[10px] text-muted-foreground px-1">{senderName}</span>
@@ -114,12 +123,12 @@ const MessageBubble = ({ message, isOwn, senderName, conversationId, showSeen, s
 
         {/* Bubble */}
         <div
-          className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed
+          className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed w-full overflow-hidden
             ${isOwn
               ? "bubble-own text-white shadow-md shadow-primary/20 rounded-br-sm"
               : "bg-muted text-foreground rounded-bl-sm"
             }
-            ${hasMedia && !hasText ? "p-0 overflow-hidden" : ""}
+            ${hasMedia && !hasText ? "p-0" : ""}
           `}
         >
           {/* ── Reply quote ── */}
@@ -144,7 +153,7 @@ const MessageBubble = ({ message, isOwn, senderName, conversationId, showSeen, s
           {hasMedia ? (
             <MediaMessage message={message} isOwn={isOwn} />
           ) : hasText ? (
-            <p className="break-words whitespace-pre-wrap">
+            <p className="break-words whitespace-pre-wrap min-w-0 w-full">
               {renderTextWithLinks(message.text)}
             </p>
           ) : null}
