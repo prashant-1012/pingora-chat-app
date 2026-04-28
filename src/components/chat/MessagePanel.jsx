@@ -10,20 +10,20 @@ import {
   selectActiveConversation,
   selectUserCache,
   selectReplyingTo,
-  selectMediaMessages,
+  // selectMediaMessages, // Phase 7 — re-enable with media gallery
   sendMessageAsync,
 } from "../../features/chat/chatSlice";
 import { selectCurrentUser } from "../../features/auth/authSlice";
 import { selectUserStatus } from "../../features/presence/presenceSlice";
 import { subscribeToTyping } from "../../firebase/presenceService";
 import { markMessageAsRead } from "../../firebase/chatService";
-import { uploadFile } from "../../firebase/storageService";
+// import { uploadFile } from "../../firebase/storageService"; // Phase 7
 import useUserStatus from "../../hooks/useUserStatus";
 import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
 import TypingIndicator from "./TypingIndicator";
 import ReplyBar from "./ReplyBar";
-import MediaGalleryDrawer from "./MediaGalleryDrawer";
+// import MediaGalleryDrawer from "./MediaGalleryDrawer"; // Phase 7
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ const MessagePanel = ({ otherUser, onShowGroupInfo, onBack }) => {
   const messagesLoading = useSelector(selectMessagesLoading);
   const userCache = useSelector(selectUserCache);
   const replyingTo = useSelector(selectReplyingTo);
-  const mediaMessages = useSelector(selectMediaMessages);
+  // const mediaMessages = useSelector(selectMediaMessages); // Phase 7
 
   const isGroup = conversation?.type === "group";
 
@@ -122,47 +122,11 @@ const MessagePanel = ({ otherUser, onShowGroupInfo, onBack }) => {
     setSending(false);
   };
 
-  // ── File upload ────────────────────────────────────────────────────────────
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadError, setUploadError] = useState(null);
-
-  const handleFileSelect = async (file) => {
-    if (!conversation?.id || !currentUser?.uid) return;
-    console.log("[MessagePanel] File selected:", { name: file.name, size: file.size, type: file.type });
-    console.log("[MessagePanel] Upload context:", { conversationId: conversation.id, uid: currentUser.uid });
-    setUploading(true);
-    setUploadError(null);
-    setUploadProgress(0);
-    try {
-      const { downloadURL, mediaType, fileName, fileSize } = await uploadFile(
-        file,
-        conversation.id,
-        currentUser.uid,
-        setUploadProgress
-      );
-      await dispatch(sendMessageAsync({
-        conversationId: conversation.id,
-        senderId: currentUser.uid,
-        text: "",
-        mediaURL: downloadURL,
-        mediaType,
-        fileName,
-        fileSize,
-        replyTo: replyingTo,
-      }));
-    } catch (err) {
-      console.error("[MessagePanel] Upload failed:", err.code, err.message, err);
-      setUploadError(err.message ?? "Upload failed.");
-      setTimeout(() => setUploadError(null), 6000);
-    } finally {
-      setUploading(false);
-      setUploadProgress(0);
-    }
-  };
-
-  // ── Gallery drawer ─────────────────────────────────────────────────────────
-  const [showGallery, setShowGallery] = useState(false);
+  // Phase 7 — file upload + gallery disabled until CORS is fixed
+  // const [uploading, setUploading] = useState(false);
+  // const [uploadProgress, setUploadProgress] = useState(0);
+  // const [uploadError, setUploadError] = useState(null);
+  // const [showGallery, setShowGallery] = useState(false);
 
   // ── Header info ────────────────────────────────────────────────────────────
   const headerName = isGroup ? conversation.groupName : otherUser?.displayName ?? "Chat";
@@ -210,23 +174,7 @@ const MessagePanel = ({ otherUser, onShowGroupInfo, onBack }) => {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Media gallery button — always shown */}
-          <button
-            id="media-gallery-btn"
-            onClick={() => setShowGallery(true)}
-            title="Shared media"
-            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-              <path d="M21 15l-5-5L5 21"/>
-            </svg>
-            {mediaMessages.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] flex items-center justify-center font-bold">
-                {mediaMessages.length > 9 ? "9+" : mediaMessages.length}
-              </span>
-            )}
-          </button>
+          {/* Phase 7 — media gallery button removed until CORS is fixed */}
 
           {isGroup ? (
             <button id="group-info-btn" onClick={onShowGroupInfo} title="Group info" className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
@@ -290,31 +238,7 @@ const MessagePanel = ({ otherUser, onShowGroupInfo, onBack }) => {
       {/* ── Typing indicator ── */}
       <TypingIndicator typingUids={typingUids} userCache={userCache} currentUserUid={currentUser?.uid} />
 
-      {/* ── Upload progress bar ── */}
-      {uploading && (
-        <div className="flex items-center gap-3 px-5 py-2 border-t border-border bg-card/80">
-          <svg className="w-3.5 h-3.5 text-primary animate-pulse shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-          </svg>
-          <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-200"
-              style={{ width: `${uploadProgress}%` }}
-            />
-          </div>
-          <span className="text-xs text-muted-foreground shrink-0 w-8 text-right">{uploadProgress}%</span>
-        </div>
-      )}
-
-      {/* ── Upload error ── */}
-      {uploadError && (
-        <div className="flex items-center gap-2 px-5 py-2 border-t border-border bg-destructive/10 text-destructive text-xs">
-          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          {uploadError}
-        </div>
-      )}
+      {/* Phase 7 — upload progress, upload error, gallery drawer removed until CORS is fixed */}
 
       {/* ── Reply bar (above input) ── */}
       <ReplyBar />
@@ -322,14 +246,10 @@ const MessagePanel = ({ otherUser, onShowGroupInfo, onBack }) => {
       {/* ── Input ── */}
       <MessageInput
         onSend={handleSend}
-        onFileSelect={handleFileSelect}
-        disabled={sending || messagesLoading || uploading}
+        disabled={sending || messagesLoading}
         conversationId={conversation?.id}
         uid={currentUser?.uid}
       />
-
-      {/* ── Media gallery drawer ── */}
-      {showGallery && <MediaGalleryDrawer onClose={() => setShowGallery(false)} />}
     </div>
   );
 };

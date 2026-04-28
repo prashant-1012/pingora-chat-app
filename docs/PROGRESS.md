@@ -126,8 +126,11 @@
 - [ ] Error boundaries
 
 ## Phase 10: Security + Deployment
-- [ ] Firestore security rules
-- [ ] Storage security rules
-- [ ] Firebase Hosting / Vercel deploy
-- [ ] Environment variables on Vercel
-- [ ] Final review
+- [x] Firestore rules — `allow read, write: if request.auth != null` (deploy in Firebase Console → Firestore → Rules)
+- [x] Storage rules — authenticated users only, 50 MB write cap (deploy in Firebase Console → Storage → Rules)
+- [x] `vercel.json` — SPA rewrite rule so React Router works on Vercel
+- [x] `.gitignore` — `.env` added (was missing, security fix)
+- [x] `npm run build` — passes clean (689 kB JS, 24 kB CSS)
+- [x] Media upload/gallery UI disabled (attachment btn, progress bar, gallery drawer) until Firebase Storage CORS is configured via gsutil
+- [ ] Deploy to Vercel (manual step — see instructions below)
+- [ ] Add production URL to CORS config (`cors.json`) and redeploy gsutil after Vercel URL is known
